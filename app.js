@@ -1,3 +1,4 @@
+
 (() => {
 "use strict";
 
@@ -101,6 +102,10 @@ let term = "";
 
 function toast(message) {
   const el = $("#toast");
+  if (!el) {
+    alert(message);
+    return;
+  }
   el.textContent = message;
   clearTimeout(toast.t);
   toast.t = setTimeout(() => {
@@ -130,7 +135,6 @@ function sizeConfig(p) {
 
   if (type === "none" || type === "other") return null;
 
-  // Bra: band number + cup size
   if (type === "bra" || /\b(bra|bralette)\b/.test(title)) {
     return {
       label: "Select bra size",
@@ -147,7 +151,6 @@ function sizeConfig(p) {
     };
   }
 
-  // Shoes: shoe number
   if (
     type === "shoes" ||
     /\b(shoes?|sneakers?|sports shoes?)\b/.test(title)
@@ -160,7 +163,6 @@ function sizeConfig(p) {
     };
   }
 
-  // Sandals / chappal: footwear number
   if (
     type === "sandals" ||
     /\b(sandals?|slippers?|chappal|flip flops?)\b/.test(title)
@@ -173,7 +175,6 @@ function sizeConfig(p) {
     };
   }
 
-  // Normal clothing sizes
   if (
     ["clothes", "clothing"].includes(type) ||
     /\b(kurti|kurta|t-?shirts?|shirts?|dress|jeans|trousers|leggings|top|hoodie|jacket|clothes|sweater|blouse)\b/.test(title) ||
@@ -190,14 +191,14 @@ function sizeConfig(p) {
   return null;
 }
 
-/* PRODUCT LIST AND CARDS */
+/* PRODUCT LIST */
 
 function list() {
   let a = products.filter(p => p.active !== false);
 
   if (cat !== "All") {
     a = a.filter(p =>
-      p.category.toLowerCase() === cat.toLowerCase()
+      String(p.category || "").toLowerCase() === cat.toLowerCase()
     );
   }
 
@@ -223,20 +224,26 @@ function renderProducts() {
 
   $("#products").innerHTML = a.map(p => {
     const cfg = sizeConfig(p);
+    const discount = p.oldPrice > p.price
+      ? Math.round(100 * (1 - p.price / p.oldPrice))
+      : 0;
 
     return `
       <article class="product-card">
-        <div class="product-image-wrap" data-detail="${esc(p.id)}">
-          <img
-            class="product-image"
-            src="${esc(p.image || placeholder)}"
-            alt="${esc(p.title)}"
-          >
+        <div class="product-image-wrap"
+          data-detail="${esc(p.id)}"
+          role="button" tabindex="0"
+          aria-label="View ${esc(p.title)} details">
+          <img class="product-image"
+            src="${esc(validUrl(p.image) || placeholder)}"
+            alt="${esc(p.title)}">
           <span class="product-tag">${esc(p.tag || "SALE")}</span>
         </div>
 
         <div class="product-info">
-          <h3 class="product-title" data-detail="${esc(p.id)}">
+          <h3 class="product-title"
+            data-detail="${esc(p.id)}"
+            role="button" tabindex="0">
             ${esc(p.title)}
           </h3>
 
@@ -245,29 +252,24 @@ function renderProducts() {
           <div class="product-price">
             <span class="price-now">${money(p.price)}</span>
             <span class="price-old">${money(p.oldPrice)}</span>
-            ${
-              p.oldPrice > p.price
-                ? `<span class="discount">${Math.round(100 * (1 - p.price / p.oldPrice))}% off</span>`
-                : ""
-            }
+            ${discount ? `<span class="discount">${discount}% off</span>` : ""}
           </div>
 
           <p class="product-description">${esc(p.description || "")}</p>
+          <p class="policy-short">↩️ 10 Days Return*</p>
 
           ${
-            cfg
-              ? `
-                <label class="size-label">
-                  ${esc(cfg.label)}
-                  <select class="product-size" data-size-for="${esc(p.id)}">
-                    <option value="">Choose size</option>
-                    ${cfg.sizes.map(s =>
-                      `<option value="${esc(s)}">${esc(s)}</option>`
-                    ).join("")}
-                  </select>
-                </label>
-              `
-              : ""
+            cfg ? `
+              <label class="size-label">
+                ${esc(cfg.label)}
+                <select class="product-size" data-size-for="${esc(p.id)}">
+                  <option value="">Choose size</option>
+                  ${cfg.sizes.map(s =>
+                    `<option value="${esc(s)}">${esc(s)}</option>`
+                  ).join("")}
+                </select>
+              </label>
+            ` : ""
           }
 
           <div class="product-buttons">
@@ -292,20 +294,211 @@ function renderProducts() {
   renderAdminProducts();
 }
 
-/* ADD TO CART: SELECTED SIZE IS SAVED */
+/* PRODUCT DETAILS MODAL */
 
-function add(p, buyNow = false) {
+function ensureDetailModal() {
+  let modal = $("#productDetailOverlay");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "productDetailOverlay";
+  modal.className = "overlay";
+  modal.hidden = true;
+
+  modal.innerHTML = `
+    <section class="modal product-detail-modal"
+      role="dialog" aria-modal="true" aria-label="Product details">
+      <button type="button" class="detail-close"
+        data-close="productDetailOverlay" aria-label="Close">✕</button>
+      <div id="productDetailContent"></div>
+    </section>
+  `;
+
+  document.body.appendChild(modal);
+
+  const style = document.createElement("style");
+  style.textContent = `
+    [hidden] { display: none !important; }
+    .product-image-wrap, .product-title { cursor: pointer; }
+    .policy-short {
+      color: #7c246c;
+      font-size: 12px;
+      font-weight: 700;
+      margin: 7px 0;
+    }
+    .product-detail-modal {
+      width: min(94vw, 680px);
+      max-height: 90vh;
+      overflow-y: auto;
+      position: relative;
+      background: #fff;
+      border-radius: 14px;
+    }
+    .detail-close {
+      position: sticky;
+      top: 0;
+      float: right;
+      z-index: 3;
+      border: 0;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      background: #f5eaf4;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .detail-image {
+      display: block;
+      width: 100%;
+      max-height: 390px;
+      object-fit: contain;
+      background: #faf6fa;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .detail-price {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0;
+    }
+    .detail-price .price-now { font-size: 25px; }
+    .detail-policy {
+      background: #f8f1f8;
+      border: 1px solid #ead9e9;
+      border-radius: 10px;
+      padding: 13px;
+      margin: 16px 0;
+      line-height: 1.5;
+    }
+    .detail-policy p { margin: 7px 0; }
+    .detail-qty {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 14px 0;
+    }
+    .detail-qty button {
+      min-width: 36px;
+      min-height: 36px;
+      cursor: pointer;
+    }
+    .detail-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .detail-actions button { flex: 1; }
+    .detail-policy small { display: block; margin-top: 8px; }
+    @media(max-width:480px) {
+      .detail-actions { flex-direction: column; }
+    }
+  `;
+  document.head.appendChild(style);
+
+  return modal;
+}
+
+function openProductDetails(id) {
+  const p = products.find(x =>
+    String(x.id) === String(id) && x.active !== false
+  );
+  if (!p) return;
+
+  const cfg = sizeConfig(p);
+  const discount = p.oldPrice > p.price
+    ? Math.round((1 - p.price / p.oldPrice) * 100)
+    : 0;
+
+  const modal = ensureDetailModal();
+
+  $("#productDetailContent").innerHTML = `
+    <img class="detail-image"
+      src="${esc(validUrl(p.image) || placeholder)}"
+      alt="${esc(p.title)}">
+
+    <p class="product-category">${esc(p.category)}</p>
+    <h2>${esc(p.title)}</h2>
+
+    <div class="detail-price">
+      <span class="price-now">${money(p.price)}</span>
+      ${
+        p.oldPrice > p.price
+          ? `<span class="price-old">${money(p.oldPrice)}</span>
+             <span class="discount">${discount}% off</span>`
+          : ""
+      }
+    </div>
+
+    <p>${esc(p.description || "Product details coming soon.")}</p>
+
+    ${
+      cfg ? `
+        <label class="size-label">
+          ${esc(cfg.label)}
+          <select id="detailSize" class="product-size">
+            <option value="">Choose size</option>
+            ${cfg.sizes.map(s =>
+              `<option value="${esc(s)}">${esc(s)}</option>`
+            ).join("")}
+          </select>
+        </label>
+      ` : ""
+    }
+
+    <div class="detail-qty">
+      <b>Quantity</b>
+      <button type="button" data-detail-qty="-1">−</button>
+      <span id="detailQty">1</span>
+      <button type="button" data-detail-qty="1">+</button>
+    </div>
+
+    <div class="detail-policy">
+      <h3>↩️ 10 Days Return, Replacement & Refund</h3>
+      <p>Eligible products ke liye delivery ke 10 din ke andar request karein.</p>
+      <p>Return ya replacement product ki eligibility aur condition ke adheen hoga.</p>
+      <p>Refund approval aur verification ke baad applicable process ke mutabik hoga.</p>
+      <small>*Terms and conditions apply. Product-specific exclusions ho sakte hain. Sirf wahi policy advertise karein jo aap fulfil kar sakte hain.</small>
+    </div>
+
+    <p><b>Payment:</b> UPI available · Cash on Delivery unavailable</p>
+
+    <div class="detail-actions">
+      <button type="button" class="add-btn"
+        data-detail-add="${esc(p.id)}">Add to Cart</button>
+      <button type="button" class="buy-btn"
+        data-detail-buy="${esc(p.id)}">Buy Now</button>
+    </div>
+  `;
+
+  const img = $(".detail-image");
+  img.onerror = () => {
+    img.onerror = null;
+    img.src = placeholder;
+  };
+
+  modal.hidden = false;
+}
+
+/* ADD TO CART */
+
+function add(p, buyNow = false, options = null) {
   const cfg = sizeConfig(p);
   let size = "";
+  let qty = 1;
 
-  if (cfg) {
+  if (options) {
+    size = options.size || "";
+    qty = Math.max(1, parseInt(options.qty, 10) || 1);
+  } else if (cfg) {
     const sel = $(`[data-size-for="${CSS.escape(String(p.id))}"]`);
     size = sel ? sel.value : "";
+  }
 
-    if (!size) {
-      toast(cfg.label + " choose karein");
-      return;
-    }
+  if (cfg && !size) {
+    toast(cfg.label + " choose karein");
+    return;
   }
 
   const existing = cart.find(x =>
@@ -314,14 +507,14 @@ function add(p, buyNow = false) {
   );
 
   if (existing) {
-    existing.qty++;
+    existing.qty += qty;
   } else {
     cart.push({
       id: p.id,
       title: p.title,
       price: +p.price,
       image: p.image,
-      qty: 1,
+      qty,
       size
     });
   }
@@ -333,11 +526,13 @@ function add(p, buyNow = false) {
 }
 
 function show(id) {
-  $("#" + id).hidden = false;
+  const el = $("#" + id);
+  if (el) el.hidden = false;
 }
 
 function hide(id) {
-  $("#" + id).hidden = true;
+  const el = $("#" + id);
+  if (el) el.hidden = true;
 }
 
 function hideAll() {
@@ -350,36 +545,21 @@ function renderCart(open = true) {
   $("#cartItems").innerHTML = cart.length
     ? cart.map(i => `
         <div class="cart-line">
-          <img src="${esc(i.image)}" alt="">
-
+          <img src="${esc(validUrl(i.image) || placeholder)}" alt="">
           <div>
             <h4>${esc(i.title)}</h4>
             <p>${money(i.price)} each</p>
-
             ${i.size ? `<p><b>Selected size: ${esc(i.size)}</b></p>` : ""}
-
             <div class="qty-controls">
-              <button
-                data-qty="${esc(i.id)}"
-                data-size="${esc(i.size || "")}"
-                data-delta="-1"
-              >−</button>
-
+              <button data-qty="${esc(i.id)}"
+                data-size="${esc(i.size || "")}" data-delta="-1">−</button>
               <span>${i.qty}</span>
-
-              <button
-                data-qty="${esc(i.id)}"
-                data-size="${esc(i.size || "")}"
-                data-delta="1"
-              >+</button>
-
-              <button
-                data-remove="${esc(i.id)}"
-                data-size="${esc(i.size || "")}"
-              >Remove</button>
+              <button data-qty="${esc(i.id)}"
+                data-size="${esc(i.size || "")}" data-delta="1">+</button>
+              <button data-remove="${esc(i.id)}"
+                data-size="${esc(i.size || "")}">Remove</button>
             </div>
           </div>
-
           <b>${money(i.price * i.qty)}</b>
         </div>
       `).join("")
@@ -391,7 +571,7 @@ function renderCart(open = true) {
   if (open) show("cartOverlay");
 }
 
-/* UPI PAYMENT LINK AND DYNAMIC QR */
+/* UPI PAYMENT AND QR */
 
 function upiUri(amount, ref) {
   if (!payment.upiId) return "";
@@ -413,54 +593,37 @@ function renderPayment() {
 
   host.innerHTML = `
     <h3>Pay ${money(sum)} via UPI</h3>
-
     <p>UPI ID:
       <code>${esc(payment.upiId || "Set this in Admin → UPI & QR")}</code>
     </p>
-
     <p class="payment-total">Exact cart total: ${money(sum)}</p>
-
     ${
-      uri
-        ? `
-          <div id="dynamicQr" class="qr-holder"></div>
-
-          <a class="primary full" href="${esc(uri)}">
-            Pay exact ${money(sum)} via UPI
-          </a>
-
-          <button id="copyUpi" class="plain full" type="button">
-            Copy UPI link
-          </button>
-        `
-        : ""
+      uri ? `
+        <div id="dynamicQr" class="qr-holder"></div>
+        <a class="primary full" href="${esc(uri)}">
+          Pay exact ${money(sum)} via UPI
+        </a>
+        <button id="copyUpi" class="plain full" type="button">Copy UPI link</button>
+      ` : ""
     }
-
     ${
-      validUrl(payment.qrImage)
-        ? `
-          <p class="muted">Saved static QR image (may not include amount):</p>
-          <div class="qr-holder">
-            <img src="${esc(validUrl(payment.qrImage))}" alt="Merchant QR">
-          </div>
-        `
-        : ""
+      validUrl(payment.qrImage) ? `
+        <p class="muted">Saved static QR image (may not include amount):</p>
+        <div class="qr-holder">
+          <img src="${esc(validUrl(payment.qrImage))}" alt="Merchant QR">
+        </div>
+      ` : ""
     }
-
     <p class="muted">
-      Payment is not auto-verified by this demo.
-      Admin must confirm it separately. UPI app behaviour may vary.
+      Payment is not auto-verified by this demo. Admin must confirm it separately.
+      UPI app behaviour may vary.
     </p>
   `;
 
   const q = $("#dynamicQr");
 
   if (q && uri && window.QRCode) {
-    new QRCode(q, {
-      text: uri,
-      width: 190,
-      height: 190
-    });
+    new QRCode(q, { text: uri, width: 190, height: 190 });
   } else if (q) {
     q.textContent = "QR library not loaded; use UPI button.";
   }
@@ -487,7 +650,7 @@ function openCheckout() {
   show("checkoutOverlay");
 }
 
-/* ORDER CARDS AND ORDER HISTORY */
+/* ORDER HISTORY */
 
 function card(o, admin = false) {
   const paid = (o.paymentStatus || "").toLowerCase().includes("paid");
@@ -500,10 +663,8 @@ function card(o, admin = false) {
           ${esc(o.paymentStatus)}
         </span>
       </h4>
-
       <p><b>${esc(o.name)}</b> · ${esc(o.phone)}</p>
       <p>${esc(o.address)}</p>
-
       <p>
         ${(o.items || []).map(i => `
           ${esc(i.title)}
@@ -511,21 +672,15 @@ function card(o, admin = false) {
           × ${i.qty} — ${money(i.price * i.qty)}
         `).join("<br>")}
       </p>
-
       <p>
         <b>Total: ${money(o.total)}</b><br>
         ${esc(new Date(o.createdAt).toLocaleString())} · ${esc(o.status)}
       </p>
-
-      ${
-        admin
-          ? `
-            <button data-paid="${esc(o.id)}">Mark payment verified</button>
-            <button data-pending="${esc(o.id)}">Mark pending</button>
-            <button data-cancel="${esc(o.id)}">Cancel</button>
-          `
-          : ""
-      }
+      ${admin ? `
+        <button data-paid="${esc(o.id)}">Mark payment verified</button>
+        <button data-pending="${esc(o.id)}">Mark pending</button>
+        <button data-cancel="${esc(o.id)}">Cancel</button>
+      ` : ""}
     </article>
   `;
 }
@@ -557,7 +712,6 @@ function renderAdminProducts() {
         <b>${esc(p.title)}</b><br>
         ${money(p.price)} · ${esc(p.category)}
       </span>
-
       <button data-delprod="${esc(p.id)}">Delete</button>
     </div>
   `).join("");
@@ -589,9 +743,7 @@ function tab(t) {
 function placeOrder(e) {
   e.preventDefault();
 
-  if (!cart.length) {
-    return toast("Cart khaali hai");
-  }
+  if (!cart.length) return toast("Cart khaali hai");
 
   const f = new FormData(e.currentTarget);
   const name = String(f.get("name")).trim();
@@ -641,32 +793,61 @@ function placeOrder(e) {
   );
 }
 
-/* BUTTON ACTIONS */
+/* ALL CLICK ACTIONS */
 
 document.addEventListener("click", e => {
-  const b = e.target.closest("[data-add],[data-buy]");
+  const detailButton = e.target.closest("[data-detail-add], [data-detail-buy]");
 
-  if (b) {
-    const id = b.dataset.add || b.dataset.buy;
+  if (detailButton) {
+    const id = detailButton.dataset.detailAdd || detailButton.dataset.detailBuy;
     const p = products.find(x => String(x.id) === String(id));
+    if (!p) return;
 
-    if (p) add(p, !!b.dataset.buy);
+    const cfg = sizeConfig(p);
+    const size = $("#detailSize")?.value || "";
+
+    if (cfg && !size) {
+      toast(cfg.label + " choose karein");
+      return;
+    }
+
+    const buyNow = !!detailButton.dataset.detailBuy;
+    const qty = $("#detailQty")?.textContent || 1;
+
+    if (buyNow) hide("productDetailOverlay");
+
+    add(p, buyNow, { size, qty });
+    return;
+  }
+
+  const qtyDetail = e.target.closest("[data-detail-qty]");
+
+  if (qtyDetail) {
+    const q = $("#detailQty");
+    if (q) {
+      q.textContent = Math.max(
+        1,
+        (parseInt(q.textContent, 10) || 1) +
+          Number(qtyDetail.dataset.detailQty)
+      );
+    }
+    return;
   }
 
   const detail = e.target.closest("[data-detail]");
 
   if (detail) {
-    const p = products.find(x =>
-      String(x.id) === String(detail.dataset.detail)
-    );
+    openProductDetails(detail.dataset.detail);
+    return;
+  }
 
-    if (p) {
-      alert(
-        p.title + "\n" +
-        money(p.price) + "\n" +
-        (p.description || "")
-      );
-    }
+  const b = e.target.closest("[data-add], [data-buy]");
+
+  if (b) {
+    const id = b.dataset.add || b.dataset.buy;
+    const p = products.find(x => String(x.id) === String(id));
+    if (p) add(p, !!b.dataset.buy);
+    return;
   }
 
   const q = e.target.closest("[data-qty]");
@@ -677,33 +858,35 @@ document.addEventListener("click", e => {
       String(x.size || "") === String(q.dataset.size || "")
     );
 
-    if (item) item.qty += +q.dataset.delta;
-
+    if (item) item.qty += Number(q.dataset.delta);
     cart = cart.filter(x => x.qty > 0);
-
     saveC();
     renderCart(false);
+    return;
   }
 
   const remove = e.target.closest("[data-remove]");
 
   if (remove) {
-    cart = cart.filter(x =>
-      !(
-        String(x.id) === String(remove.dataset.remove) &&
-        String(x.size || "") === String(remove.dataset.size || "")
-      )
-    );
+    cart = cart.filter(x => !(
+      String(x.id) === String(remove.dataset.remove) &&
+      String(x.size || "") === String(remove.dataset.size || "")
+    ));
 
     saveC();
     renderCart(false);
+    return;
   }
 
   const close = e.target.closest("[data-close]");
-  if (close) hide(close.dataset.close);
+  if (close) {
+    hide(close.dataset.close);
+    return;
+  }
 
   if (e.target.classList.contains("overlay")) {
     hide(e.target.id);
+    return;
   }
 
   const del = e.target.closest("[data-delprod]");
@@ -712,49 +895,63 @@ document.addEventListener("click", e => {
     products = products.filter(p =>
       String(p.id) !== String(del.dataset.delprod)
     );
-
     saveP();
     renderProducts();
+    return;
   }
 
   const paid = e.target.closest("[data-paid]");
 
   if (paid) {
     const o = orders.find(x => x.id === paid.dataset.paid);
-
     if (o) {
       o.paymentStatus = "Paid (manually verified)";
       write(K.o, orders);
       renderAdminOrders();
     }
+    return;
   }
 
   const pending = e.target.closest("[data-pending]");
 
   if (pending) {
     const o = orders.find(x => x.id === pending.dataset.pending);
-
     if (o) {
       o.paymentStatus = "Pending verification";
       write(K.o, orders);
       renderAdminOrders();
     }
+    return;
   }
 
   const cancel = e.target.closest("[data-cancel]");
 
   if (cancel) {
     const o = orders.find(x => x.id === cancel.dataset.cancel);
-
     if (o) {
       o.status = "Cancelled";
       write(K.o, orders);
       renderAdminOrders();
     }
+    return;
   }
 
   const t = e.target.closest("[data-tab]");
   if (t) tab(t.dataset.tab);
+});
+
+/* KEYBOARD ACCESS FOR PRODUCT CARDS */
+
+document.addEventListener("keydown", e => {
+  if (
+    (e.key === "Enter" || e.key === " ") &&
+    e.target.matches("[data-detail]")
+  ) {
+    e.preventDefault();
+    openProductDetails(e.target.dataset.detail);
+  }
+
+  if (e.key === "Escape") hideAll();
 });
 
 /* SEARCH, SORT AND CATEGORIES */
@@ -797,7 +994,7 @@ $("#reset").addEventListener("click", () => {
   renderProducts();
 });
 
-/* CART, CHECKOUT AND HISTORY BUTTONS */
+/* CART, CHECKOUT AND HISTORY */
 
 $("#cartOpen").addEventListener("click", () => renderCart(true));
 $("#checkoutOpen").addEventListener("click", openCheckout);
@@ -810,10 +1007,7 @@ $("#historyOpen").addEventListener("click", () => {
 
 $("#historyLookup").addEventListener("submit", e => {
   e.preventDefault();
-
-  renderHistory(
-    String(new FormData(e.currentTarget).get("phone")).trim()
-  );
+  renderHistory(String(new FormData(e.currentTarget).get("phone")).trim());
 });
 
 /* ADMIN LOGIN */
@@ -837,7 +1031,7 @@ $("#adminForm").addEventListener("submit", e => {
   tab("products");
 });
 
-/* ADD PRODUCT AND ITS SIZE SETTINGS */
+/* ADD PRODUCT */
 
 $("#addForm").addEventListener("submit", e => {
   e.preventDefault();
@@ -880,7 +1074,7 @@ $("#resetDemo").addEventListener("click", () => {
   }
 });
 
-/* UPDATE UPI AND QR SETTINGS */
+/* UPI AND QR SETTINGS */
 
 $("#paymentForm").addEventListener("submit", e => {
   e.preventDefault();
@@ -902,11 +1096,7 @@ $("#paymentForm").addEventListener("submit", e => {
   toast("Payment settings saved");
 });
 
-/* CLOSE OVERLAYS WITH ESCAPE */
-
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape") hideAll();
-});
+/* INITIAL LOAD */
 
 $("#year").textContent = new Date().getFullYear();
 
