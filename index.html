@@ -1,16 +1,273 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#9f2089"><title>Meesho Sale</title><link rel="stylesheet" href="./style.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script><script src="./app.js" defer></script></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9f2089">
+  <title>Meesho Sale</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
 <body>
-<div class="top">MEGA SALE · Extra savings on everyday finds</div>
-<header><a class="brand" href="./"><b>m</b> Meesho<span>Sale</span></a><div class="search"><input id="search" type="search" placeholder="Search products"><button id="clear" type="button">×</button></div><button id="historyOpen" class="plain" type="button">My Orders</button><button id="adminOpen" class="plain" type="button">Admin</button><button id="cartOpen" class="cart" type="button">🛍 Cart <b id="count">0</b></button></header>
-<section class="live"><div><small>🔴 LIVE SALE</small><h2>Sale Ends In!</h2><p>Hurry! Explore today's special deals.</p></div><strong id="liveCountdown">10:00</strong></section>
-<main><section class="hero"><small>THE EVERYDAY SALE</small><h1>Good finds.<br><em>Happy prices.</em></h1><p>Fashion, home essentials and little things you'll love — at easy-on-pocket prices.</p><a class="primary" href="#shop">Shop the sale →</a></section>
-<section id="shop"><div class="heading"><h2>Shop popular picks</h2><span id="resultCount">12 products</span></div><nav id="categories"><button class="active" data-cat="All">All products</button><button data-cat="Women">Women</button><button data-cat="Men">Men</button><button data-cat="Kids">Kids</button><button data-cat="Beauty">Beauty</button><button data-cat="Home">Home</button><button data-cat="Kitchen">Kitchen</button><button data-cat="Accessories">Accessories</button></nav><div class="tools"><span>Fresh deals for everyday needs</span><label>Sort <select id="sort"><option value="featured">Recommended</option><option value="low">Price low to high</option><option value="high">Price high to low</option><option value="name">Name</option></select></label></div><div id="products" class="grid"></div><div id="empty" hidden>No products found. <button id="reset">Show all</button></div></section></main>
-<footer>© <span id="year"></span> Meesho Sale · COD unavailable. Independent demo, not affiliated with Meesho.</footer><div id="toast" class="toast"></div>
-<div id="cartOverlay" class="overlay" hidden><section class="panel"><div class="panelhead"><h2>Shopping cart</h2><button data-close="cartOverlay" class="x">×</button></div><div id="cartItems"></div><p class="subtotal">Subtotal <b id="subtotal">₹0</b></p><p class="muted">Cash on Delivery unavailable. UPI only.</p><button id="checkoutOpen" class="primary full">Continue to checkout</button><button data-close="cartOverlay" class="plain full">Continue shopping</button></section></div>
-<div id="checkoutOverlay" class="overlay" hidden><section class="modal"><div class="panelhead"><h2>Checkout</h2><button data-close="checkoutOverlay" class="x">×</button></div><div class="notice">COD unavailable. Payment is not automatically verified on this demo.</div><form id="checkoutForm"><label>Full name<input name="name" required maxlength="100"></label><label>Mobile number<input name="phone" type="tel" pattern="[0-9]{10}" required placeholder="10-digit number"></label><label>Delivery address<textarea name="address" required maxlength="500"></textarea></label><div id="checkoutPayment" class="payment"></div><label class="checkline"><input name="ack" type="checkbox" required> I understand the order stays pending until payment is verified.</label><button class="primary full" type="submit">Place order / Save order</button></form><div id="checkoutResult" hidden></div></section></div>
-<div id="historyOverlay" class="overlay" hidden><section class="modal"><div class="panelhead"><h2>My Order History</h2><button data-close="historyOverlay" class="x">×</button></div><form id="historyLookup"><label>Enter the same 10-digit mobile number<input name="phone" type="tel" pattern="[0-9]{10}" required></label><button class="primary full">Find my orders</button></form><div id="historyResults"></div><p class="muted">Demo orders are stored only in this browser.</p></section></div>
-<div id="adminOverlay" class="overlay" hidden><section class="modal wide"><div class="panelhead"><h2>Admin Panel</h2><button data-close="adminOverlay" class="x">×</button></div><p class="notice">Demo only: PIN and data are not secure for a live store. Data is stored in this browser.</p><form id="adminForm"><label>Demo PIN<input name="pin" type="password" required placeholder="PIN"></label><button class="primary full">Unlock admin</button></form><div id="adminTools" hidden><nav class="tabs"><button type="button" data-tab="products">Products</button><button type="button" data-tab="payments">UPI & QR</button><button type="button" data-tab="orders">Orders</button></nav><section data-panel="products"><p>Products: <b id="adminCount">12</b></p><h3>Add product</h3><form id="addForm"><label>Name<input name="title" required></label><label>Price<select name="price"><option>149</option><option selected>199</option><option>249</option><option>299</option></select></label><label>Original price<input name="oldPrice" type="number" min="0"></label><label>Category<select name="category"><option>Women</option><option>Men</option><option>Kids</option><option>Beauty</option><option>Home</option><option>Kitchen</option><option>Accessories</option></select></label><label>Image URL<input name="image" type="url"></label><label>Description<textarea name="description"></textarea></label><button class="primary full">Add product</button></form><div id="adminProducts"></div><button id="resetDemo" class="danger full" type="button">Restore demo products</button></section><section data-panel="payments" hidden><h3>Payment settings</h3><form id="paymentForm"><label>Business name<input name="merchantName" required></label><label>Business UPI ID<input name="upiId" required placeholder="merchant@bank"></label><label>Static QR image URL (optional)<input name="qrImage" type="url" placeholder="https://..."></label><p class="muted">Dynamic QR below encodes UPI details and current cart amount. A static QR may not include an amount.</p><button class="primary full">Save payment settings</button></form></section><section data-panel="orders" hidden><h3>All demo orders</h3><div id="adminOrders"></div></section></div></section></div>
-<script>
-(()=>{const el=document.getElementById("liveCountdown"),key="msSaleCountdownV1",dur=600000;let end=0;try{end=+(localStorage.getItem(key)||0)}catch{}if(end<=Date.now()){end=Date.now()+dur;try{localStorage.setItem(key,end)}catch{}}function tick(){let s=Math.max(0,Math.ceil((end-Date.now())/1000));if(!s){end=Date.now()+dur;s=600;try{localStorage.setItem(key,end)}catch{}}el.textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}tick();setInterval(tick,1000)})();
-</script></body></html>
+  <div class="top">MEGA SALE · Extra savings on everyday finds</div>
+
+  <header>
+    <a class="brand" href="./"><b>m</b> Meesho<span>Sale</span></a>
+    <div class="search">
+      <input id="search" type="search" placeholder="Search products">
+      <button id="clear" type="button">×</button>
+    </div>
+    <button id="historyOpen" class="plain" type="button">My Orders</button>
+    <button id="adminOpen" class="plain" type="button">Admin</button>
+    <button id="cartOpen" class="cart" type="button">🛍 Cart <b id="count">0</b></button>
+  </header>
+
+  <section class="live">
+    <div>
+      <small>🔴 LIVE SALE</small>
+      <h2>Sale Ends In!</h2>
+      <p>Hurry! Explore today's special deals.</p>
+    </div>
+    <strong id="liveCountdown">10:00</strong>
+  </section>
+
+  <main>
+    <section class="hero">
+      <small>THE EVERYDAY SALE</small>
+      <h1>Good finds.<br><em>Happy prices.</em></h1>
+      <p>Fashion, home essentials and little things you'll love — at easy-on-pocket prices.</p>
+      <a class="primary" href="#shop">Shop the sale →</a>
+    </section>
+
+    <section id="shop">
+      <div class="heading">
+        <h2>Shop popular picks</h2>
+        <span id="resultCount">12 products</span>
+      </div>
+
+      <nav id="categories">
+        <button class="active" data-cat="All">All products</button>
+        <button data-cat="Women">Women</button>
+        <button data-cat="Men">Men</button>
+        <button data-cat="Kids">Kids</button>
+        <button data-cat="Beauty">Beauty</button>
+        <button data-cat="Home">Home</button>
+        <button data-cat="Kitchen">Kitchen</button>
+        <button data-cat="Accessories">Accessories</button>
+      </nav>
+
+      <div class="tools">
+        <span>Fresh deals for everyday needs</span>
+        <label>Sort
+          <select id="sort">
+            <option value="featured">Recommended</option>
+            <option value="low">Price low to high</option>
+            <option value="high">Price high to low</option>
+            <option value="name">Name</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="products" class="grid"></div>
+      <div id="empty" hidden>No products found. <button id="reset">Show all</button></div>
+    </section>
+  </main>
+
+  <footer>
+    © <span id="year"></span> Meesho Sale · COD unavailable. Independent demo, not affiliated with Meesho.
+  </footer>
+
+  <div id="toast" class="toast"></div>
+
+  <div id="cartOverlay" class="overlay" hidden>
+    <section class="panel">
+      <div class="panelhead">
+        <h2>Shopping cart</h2>
+        <button data-close="cartOverlay" class="x">×</button>
+      </div>
+      <div id="cartItems"></div>
+      <p class="subtotal">Subtotal <b id="subtotal">₹0</b></p>
+      <p class="muted">Cash on Delivery unavailable. UPI only.</p>
+      <button id="checkoutOpen" class="primary full">Continue to checkout</button>
+      <button data-close="cartOverlay" class="plain full">Continue shopping</button>
+    </section>
+  </div>
+
+  <div id="checkoutOverlay" class="overlay" hidden>
+    <section class="modal">
+      <div class="panelhead">
+        <h2>Checkout</h2>
+        <button data-close="checkoutOverlay" class="x">×</button>
+      </div>
+      <div class="notice">COD unavailable. Payment is not automatically verified on this demo.</div>
+      <form id="checkoutForm">
+        <label>Full name
+          <input name="name" required maxlength="100">
+        </label>
+        <label>Mobile number
+          <input name="phone" type="tel" pattern="[0-9]{10}" required placeholder="10-digit number">
+        </label>
+        <label>Delivery address
+          <textarea name="address" required maxlength="500"></textarea>
+        </label>
+        <div id="checkoutPayment" class="payment"></div>
+        <label class="checkline">
+          <input name="ack" type="checkbox" required>
+          I understand the order stays pending until payment is verified.
+        </label>
+        <button class="primary full" type="submit">Place order / Save order</button>
+      </form>
+      <div id="checkoutResult" hidden></div>
+    </section>
+  </div>
+
+  <div id="historyOverlay" class="overlay" hidden>
+    <section class="modal">
+      <div class="panelhead">
+        <h2>My Order History</h2>
+        <button data-close="historyOverlay" class="x">×</button>
+      </div>
+      <form id="historyLookup">
+        <label>Enter the same 10-digit mobile number
+          <input name="phone" type="tel" pattern="[0-9]{10}" required>
+        </label>
+        <button class="primary full">Find my orders</button>
+      </form>
+      <div id="historyResults"></div>
+      <p class="muted">Demo orders are stored only in this browser.</p>
+    </section>
+  </div>
+
+  <div id="adminOverlay" class="overlay" hidden>
+    <section class="modal wide">
+      <div class="panelhead">
+        <h2>Admin Panel</h2>
+        <button data-close="adminOverlay" class="x">×</button>
+      </div>
+      <p class="notice">Demo only: PIN and data are not secure for a live store. Data is stored in this browser.</p>
+
+      <form id="adminForm">
+        <label>Demo PIN
+          <input name="pin" type="password" required placeholder="PIN">
+        </label>
+        <button class="primary full">Unlock admin</button>
+      </form>
+
+      <div id="adminTools" hidden>
+        <nav class="tabs">
+          <button type="button" data-tab="products">Products</button>
+          <button type="button" data-tab="payments">UPI & QR</button>
+          <button type="button" data-tab="orders">Orders</button>
+        </nav>
+
+        <section data-panel="products">
+          <p>Products: <b id="adminCount">12</b></p>
+          <h3>Add product</h3>
+
+          <form id="addForm">
+            <label>Name<input name="title" required></label>
+
+            <label>Price
+              <select name="price">
+                <option>149</option>
+                <option selected>199</option>
+                <option>249</option>
+                <option>299</option>
+              </select>
+            </label>
+
+            <label>Original price
+              <input name="oldPrice" type="number" min="0">
+            </label>
+
+            <label>Category
+              <select name="category">
+                <option>Women</option>
+                <option>Men</option>
+                <option>Kids</option>
+                <option>Clothes</option>
+                <option>Beauty</option>
+                <option>Home</option>
+                <option>Kitchen</option>
+                <option>Accessories</option>
+              </select>
+            </label>
+
+            <label>Product size type
+              <select name="sizeType">
+                <option value="auto">Auto detect from product name</option>
+                <option value="clothes">Clothes (S, M, L, XL, XXL)</option>
+                <option value="bra">Bra (30A, 30B, 32A…)</option>
+                <option value="shoes">Shoes (6, 7, 8…)</option>
+                <option value="sandals">Sandal / Chappal (3, 4, 5…)</option>
+                <option value="other">No size option</option>
+              </select>
+            </label>
+
+            <label>Available sizes (optional, comma-separated)
+              <input name="availableSizes" placeholder="Example: 32A, 32B, 34A">
+            </label>
+
+            <label>Image URL<input name="image" type="url"></label>
+            <label>Description<textarea name="description"></textarea></label>
+            <button class="primary full">Add product</button>
+          </form>
+
+          <div id="adminProducts"></div>
+          <button id="resetDemo" class="danger full" type="button">Restore demo products</button>
+        </section>
+
+        <section data-panel="payments" hidden>
+          <h3>Payment settings</h3>
+          <form id="paymentForm">
+            <label>Business name<input name="merchantName" required></label>
+            <label>Business UPI ID<input name="upiId" required placeholder="merchant@bank"></label>
+            <label>Static QR image URL (optional)<input name="qrImage" type="url" placeholder="https://..."></label>
+            <p class="muted">Dynamic QR encodes UPI details and current cart amount. A static QR may not include an amount.</p>
+            <button class="primary full">Save payment settings</button>
+          </form>
+        </section>
+
+        <section data-panel="orders" hidden>
+          <h3>All demo orders</h3>
+          <div id="adminOrders"></div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const el = document.getElementById("liveCountdown");
+      const key = "msSaleCountdownV1";
+      const duration = 600000;
+      let end = 0;
+
+      try {
+        end = +(localStorage.getItem(key) || 0);
+      } catch {}
+
+      if (end <= Date.now()) {
+        end = Date.now() + duration;
+        try { localStorage.setItem(key, end); } catch {}
+      }
+
+      function tick() {
+        let seconds = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+        if (!seconds) {
+          end = Date.now() + duration;
+          seconds = 600;
+          try { localStorage.setItem(key, end); } catch {}
+        }
+        el.textContent =
+          String(Math.floor(seconds / 60)).padStart(2, "0") + ":" +
+          String(seconds % 60).padStart(2, "0");
+      }
+
+      tick();
+      setInterval(tick, 1000);
+    })();
+  </script>
+</body>
+</html>
