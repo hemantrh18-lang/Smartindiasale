@@ -1,9 +1,11 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#9f2089">
+  <meta name="description" content="Shop everyday finds at Meesho Sale.">
   <title>Meesho Sale</title>
   <link rel="stylesheet" href="./style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
@@ -75,83 +77,191 @@
   </main>
 
   <footer>
-    © <span id="year"></span> Meesho Sale · COD unavailable. Independent demo, not affiliated with Meesho.
+    © <span id="year"></span> Meesho Sale · COD unavailable.
+    Independent demo, not affiliated with Meesho.
   </footer>
 
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+  <!-- CART -->
   <div id="cartOverlay" class="overlay" hidden>
     <section class="panel">
       <div class="panelhead">
         <h2>Shopping cart</h2>
-        <button data-close="cartOverlay" class="x">×</button>
+        <button data-close="cartOverlay" class="x" type="button" aria-label="Close cart">×</button>
       </div>
       <div id="cartItems"></div>
       <p class="subtotal">Subtotal <b id="subtotal">₹0</b></p>
       <p class="muted">Cash on Delivery unavailable. UPI only.</p>
-      <button id="checkoutOpen" class="primary full">Continue to checkout</button>
-      <button data-close="cartOverlay" class="plain full">Continue shopping</button>
+      <button id="checkoutOpen" class="primary full" type="button">Continue to checkout</button>
+      <button data-close="cartOverlay" class="plain full" type="button">Continue shopping</button>
     </section>
   </div>
 
+  <!-- CHECKOUT: ADDRESS STEP -->
   <div id="checkoutOverlay" class="overlay" hidden>
     <section class="modal">
       <div class="panelhead">
         <h2>Checkout</h2>
-        <button data-close="checkoutOverlay" class="x">×</button>
+        <button data-close="checkoutOverlay" class="x" type="button" aria-label="Close checkout">×</button>
       </div>
-      <div class="notice">COD unavailable. Payment is not automatically verified on this demo.</div>
-      <form id="checkoutForm">
-        <label>Full name
-          <input name="name" required maxlength="100">
-        </label>
-        <label>Mobile number
-          <input name="phone" type="tel" pattern="[0-9]{10}" required placeholder="10-digit number">
-        </label>
-        <label>Delivery address
-          <textarea name="address" required maxlength="500"></textarea>
-        </label>
+
+      <nav class="checkout-steps" aria-label="Checkout progress">
+        <span id="stepAddressLabel" class="checkout-step active">1. Address</span>
+        <span id="stepPaymentLabel" class="checkout-step">2. Payment</span>
+        <span id="stepConfirmLabel" class="checkout-step">3. Confirmation</span>
+      </nav>
+
+      <div class="notice">
+        COD unavailable. Your order will remain pending until payment is verified.
+      </div>
+
+      <!-- Step 1: Delivery address -->
+      <section id="addressStep" class="checkout-page">
+        <h3>Delivery address</h3>
+        <p class="muted">Enter the address where you want your order delivered.</p>
+
+        <form id="checkoutForm">
+          <label>Full name
+            <input name="name" autocomplete="name" required maxlength="100">
+          </label>
+
+          <label>Mobile number
+            <input name="phone" type="tel" inputmode="numeric"
+              autocomplete="tel" pattern="[0-9]{10}" maxlength="10"
+              required placeholder="10-digit number">
+          </label>
+
+          <label>House / Flat / Building
+            <input name="house" autocomplete="address-line1"
+              maxlength="150" required placeholder="House or flat number">
+          </label>
+
+          <label>Street / Area / Landmark
+            <input name="street" autocomplete="address-line2"
+              maxlength="200" required placeholder="Street, area or landmark">
+          </label>
+
+          <label>City
+            <input name="city" autocomplete="address-level2"
+              maxlength="100" required>
+          </label>
+
+          <label>State
+            <input name="state" autocomplete="address-level1"
+              maxlength="100" required>
+          </label>
+
+          <label>PIN code
+            <input name="pincode" inputmode="numeric"
+              autocomplete="postal-code" pattern="[0-9]{6}"
+              maxlength="6" required placeholder="6-digit PIN code">
+          </label>
+
+          <button id="continueToPayment" class="primary full" type="submit">
+            Continue to payment
+          </button>
+        </form>
+      </section>
+
+      <!-- Step 2: Payment -->
+      <section id="paymentStep" class="checkout-page" hidden>
+        <h3>Payment</h3>
+        <p class="muted">Review your total and pay using your UPI app.</p>
+
+        <div id="addressSummary" class="notice"></div>
+
+        <div class="payment-total">
+          <span>Amount to pay</span>
+          <strong id="paymentTotal">₹0</strong>
+        </div>
+
         <div id="checkoutPayment" class="payment"></div>
-        <label class="checkline">
-          <input name="ack" type="checkbox" required>
-          I understand the order stays pending until payment is verified.
-        </label>
-        <button class="primary full" type="submit">Place order / Save order</button>
-      </form>
-      <div id="checkoutResult" hidden></div>
+
+        <div class="notice">
+          After paying, your order will remain pending until the payment
+          is verified. Opening UPI or scanning a QR code alone does not
+          confirm payment.
+        </div>
+
+        <button id="openUpiPayment" class="primary full" type="button">
+          Pay using UPI
+        </button>
+
+        <button id="paymentDone" class="primary full" type="button">
+          I have paid — submit for verification
+        </button>
+
+        <button id="backToAddress" class="plain full" type="button">
+          ← Edit delivery address
+        </button>
+
+        <div id="paymentMessage" class="notice" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <!-- Step 3: Confirmation / pending status -->
+      <section id="confirmationStep" class="checkout-page" hidden>
+        <h3 id="confirmationTitle">Order submitted</h3>
+        <p id="confirmationMessage" role="status" aria-live="polite">
+          Your order is waiting for payment verification.
+        </p>
+
+        <div class="order-confirmation">
+          <p>Order ID: <strong id="confirmationOrderId">Pending</strong></p>
+          <p>Payment status: <strong id="confirmationPaymentStatus">Pending verification</strong></p>
+          <p>Order status: <strong id="confirmationOrderStatus">Awaiting verification</strong></p>
+          <p>Total: <strong id="confirmationTotal">₹0</strong></p>
+        </div>
+
+        <p class="muted">
+          Keep your UPI transaction reference/UTR for payment verification.
+          Do not share your UPI PIN or OTP with anyone.
+        </p>
+
+        <button id="confirmationDone" class="primary full" type="button">
+          Continue shopping
+        </button>
+      </section>
     </section>
   </div>
 
+  <!-- ORDER HISTORY -->
   <div id="historyOverlay" class="overlay" hidden>
     <section class="modal">
       <div class="panelhead">
         <h2>My Order History</h2>
-        <button data-close="historyOverlay" class="x">×</button>
+        <button data-close="historyOverlay" class="x" type="button" aria-label="Close order history">×</button>
       </div>
       <form id="historyLookup">
         <label>Enter the same 10-digit mobile number
-          <input name="phone" type="tel" pattern="[0-9]{10}" required>
+          <input name="phone" type="tel" inputmode="numeric"
+            pattern="[0-9]{10}" maxlength="10" required>
         </label>
-        <button class="primary full">Find my orders</button>
+        <button class="primary full" type="submit">Find my orders</button>
       </form>
       <div id="historyResults"></div>
       <p class="muted">Demo orders are stored only in this browser.</p>
     </section>
   </div>
 
+  <!-- ADMIN -->
   <div id="adminOverlay" class="overlay" hidden>
     <section class="modal wide">
       <div class="panelhead">
         <h2>Admin Panel</h2>
-        <button data-close="adminOverlay" class="x">×</button>
+        <button data-close="adminOverlay" class="x" type="button" aria-label="Close admin">×</button>
       </div>
-      <p class="notice">Demo only: PIN and data are not secure for a live store. Data is stored in this browser.</p>
+
+      <p class="notice">
+        Demo only: PIN and data are not secure for a live store.
+        Data is stored in this browser.
+      </p>
 
       <form id="adminForm">
         <label>Demo PIN
           <input name="pin" type="password" required placeholder="PIN">
         </label>
-        <button class="primary full">Unlock admin</button>
+        <button class="primary full" type="submit">Unlock admin</button>
       </form>
 
       <div id="adminTools" hidden>
@@ -211,7 +321,7 @@
 
             <label>Image URL<input name="image" type="url"></label>
             <label>Description<textarea name="description"></textarea></label>
-            <button class="primary full">Add product</button>
+            <button class="primary full" type="submit">Add product</button>
           </form>
 
           <div id="adminProducts"></div>
@@ -224,13 +334,21 @@
             <label>Business name<input name="merchantName" required></label>
             <label>Business UPI ID<input name="upiId" required placeholder="merchant@bank"></label>
             <label>Static QR image URL (optional)<input name="qrImage" type="url" placeholder="https://..."></label>
-            <p class="muted">Dynamic QR encodes UPI details and current cart amount. A static QR may not include an amount.</p>
-            <button class="primary full">Save payment settings</button>
+            <p class="muted">
+              Dynamic QR can encode UPI details and the current cart amount.
+              A static QR may not include an amount. Payment is not automatically
+              verified by this page.
+            </p>
+            <button class="primary full" type="submit">Save payment settings</button>
           </form>
         </section>
 
         <section data-panel="orders" hidden>
           <h3>All demo orders</h3>
+          <p class="muted">
+            Verify payments using your merchant payment records before marking
+            an order paid. A customer's claim alone is not proof of payment.
+          </p>
           <div id="adminOrders"></div>
         </section>
       </div>
@@ -255,11 +373,13 @@
 
       function tick() {
         let seconds = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+
         if (!seconds) {
           end = Date.now() + duration;
           seconds = 600;
           try { localStorage.setItem(key, end); } catch {}
         }
+
         el.textContent =
           String(Math.floor(seconds / 60)).padStart(2, "0") + ":" +
           String(seconds % 60).padStart(2, "0");
