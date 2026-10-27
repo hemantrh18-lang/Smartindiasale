@@ -109,3 +109,165 @@ form textarea{min-height:65px}
   .tools{align-items:flex-start;flex-direction:column}
   .panel,.modal{padding:15px}
 }
+
+/* ===== Meesho Sale: Separate checkout steps ===== */
+
+.checkout-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 14px 0 18px;
+}
+
+.checkout-step {
+  display: block;
+  text-align: center;
+  padding: 10px 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #faf8fa;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.checkout-step.active {
+  background: #f8e6f4;
+  border-color: var(--p);
+  color: var(--p);
+}
+
+.checkout-page {
+  padding-top: 4px;
+}
+
+.checkout-page h3 {
+  margin: 8px 0;
+  font-size: 20px;
+}
+
+.checkout-page > .muted {
+  margin: 5px 0 14px;
+}
+
+.checkout-page form {
+  gap: 13px;
+}
+
+.checkout-page form label {
+  font-size: 13px;
+}
+
+.checkout-page form input:not([type="checkbox"]),
+.checkout-page form select,
+.checkout-page form textarea {
+  min-height: 42px;
+  font-size: 14px;
+}
+
+.payment-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 15px;
+  margin: 14px 0;
+  background: #fff8fd;
+}
+
+.payment-total span {
+  color: #655565;
+  font-size: 13px;
+  font-weight: normal;
+}
+
+.payment-total strong {
+  color: var(--p);
+  font-size: 24px;
+}
+
+#addressSummary {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+#openUpiPayment,
+#paymentDone,
+#confirmationDone {
+  min-height: 44px;
+  text-align: center;
+}
+
+#backToAddress {
+  margin-top: 8px;
+}
+
+.order-confirmation {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin: 14px 0;
+  background: #fffafd;
+  overflow-wrap: anywhere;
+}
+
+.order-confirmation p {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.order-confirmation p:last-child {
+  border-bottom: 0;
+}
+
+.order-confirmation strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+#confirmationTitle {
+  color: var(--p);
+}
+
+#paymentMessage {
+  overflow-wrap: anywhere;
+}
+
+.checkout-page button:focus-visible,
+.checkout-steps button:focus-visible {
+  outline: 2px solid var(--p);
+  outline-offset: 3px;
+}
+
+@media(max-width:400px) {
+  .checkout-steps {
+    gap: 4px;
+  }
+
+  .checkout-step {
+    font-size: 10px;
+    padding: 9px 2px;
+  }
+
+  .payment-total strong {
+    font-size: 21px;
+  }
+
+  .order-confirmation p {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .order-confirmation strong {
+    text-align: left;
+  }
+}
