@@ -12,6 +12,13 @@
     pay: "msSalePaymentSettingsV2"
   };
 
+  const SUPABASE_URL = "https://vsljvkssdjmrucrhfcqj.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_SMz8kHd4AhpO_Iv8n3ndmQ_GBbGDDk_";
+
+  const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
   const PIN = "2468";
   const placeholder =
     "https://placehold.co/600x750/f7edf6/9f2089?text=Product";
