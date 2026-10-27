@@ -111,6 +111,7 @@
   }
 
   let products = read(K.p, null);
+
   if (!Array.isArray(products) || !products.length) {
     products = defaults.map(p => ({ ...p }));
   }
@@ -130,6 +131,7 @@
   let cat = "All";
   let term = "";
   let checkoutDraft = null;
+  let editingProductId = null;
 
   function toast(message) {
     const el = $("#toast");
@@ -141,6 +143,7 @@
 
     el.textContent = message;
     clearTimeout(toast.timer);
+
     toast.timer = setTimeout(() => {
       el.textContent = "";
     }, 3000);
@@ -154,6 +157,7 @@
     write(K.c, cart);
 
     const count = $("#count");
+
     if (count) {
       count.textContent = cart.reduce(
         (sum, item) => sum + Number(item.qty || 0),
@@ -282,8 +286,11 @@
 
     host.innerHTML = items.map(p => {
       const config = sizeConfig(p);
-      const discount = p.oldPrice > p.price
-        ? Math.round(100 * (1 - p.price / p.oldPrice))
+      const price = Number(p.price) || 0;
+      const oldPrice = Number(p.oldPrice) || 0;
+
+      const discount = oldPrice > price
+        ? Math.round(100 * (1 - price / oldPrice))
         : 0;
 
       return `
@@ -305,19 +312,22 @@
               ${esc(p.title)}
             </h3>
 
-            <p class="product-category">${esc(p.category)}</p>
+            <p class="product-category">${esc(p.category || "")}</p>
 
             <div class="product-price">
-              <span class="price-now">${money(p.price)}</span>
+              <span class="price-now">${money(price)}</span>
               ${
-                p.oldPrice > p.price
-                  ? `<span class="price-old">${money(p.oldPrice)}</span>
+                oldPrice > price
+                  ? `<span class="price-old">${money(oldPrice)}</span>
                      <span class="discount">${discount}% off</span>`
                   : ""
               }
             </div>
 
-            <p class="product-description">${esc(p.description || "")}</p>
+            <p class="product-description">
+              ${esc(p.description || "Tap to view product details.")}
+            </p>
+
             <p class="policy-short">↩️ 10 Days Return*</p>
 
             ${
@@ -348,8 +358,11 @@
       `;
     }).join("");
 
-    $("#empty").hidden = items.length > 0;
-    $("#resultCount").textContent = items.length + " products";
+    const empty = $("#empty");
+    const resultCount = $("#resultCount");
+
+    if (empty) empty.hidden = items.length > 0;
+    if (resultCount) resultCount.textContent = items.length + " products";
 
     $$(".product-image").forEach(img => {
       img.onerror = () => {
@@ -361,7 +374,7 @@
     renderAdminProducts();
   }
 
-  /* PRODUCT DETAILS */
+  /* PRODUCT DETAILS POPUP */
 
   function ensureDetailModal() {
     let modal = $("#productDetailOverlay");
@@ -384,14 +397,21 @@
     document.body.appendChild(modal);
 
     const style = document.createElement("style");
+
     style.textContent = `
       .product-image-wrap, .product-title { cursor: pointer; }
+
+      .product-title:hover {
+        color: #9f2089;
+      }
+
       .policy-short {
         color: #7c246c;
         font-size: 12px;
         font-weight: 700;
         margin: 7px 0;
       }
+
       .product-detail-modal {
         width: min(94vw, 680px);
         max-height: 90vh;
@@ -400,6 +420,7 @@
         background: #fff;
         border-radius: 14px;
       }
+
       .detail-close {
         position: sticky;
         top: 0;
@@ -413,6 +434,7 @@
         font-size: 20px;
         cursor: pointer;
       }
+
       .detail-image {
         display: block;
         width: 100%;
@@ -422,6 +444,7 @@
         border-radius: 12px;
         margin-bottom: 12px;
       }
+
       .detail-price {
         display: flex;
         align-items: center;
@@ -429,7 +452,18 @@
         gap: 10px;
         margin: 12px 0;
       }
-      .detail-price .price-now { font-size: 25px; }
+
+      .detail-price .price-now {
+        font-size: 25px;
+      }
+
+      .detail-description {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        line-height: 1.65;
+        margin: 14px 0;
+      }
+
       .detail-policy {
         background: #f8f1f8;
         border: 1px solid #ead9e9;
@@ -438,31 +472,47 @@
         margin: 16px 0;
         line-height: 1.5;
       }
-      .detail-policy p { margin: 7px 0; }
+
+      .detail-policy p {
+        margin: 7px 0;
+      }
+
       .detail-qty {
         display: flex;
         align-items: center;
         gap: 14px;
         margin: 14px 0;
       }
+
       .detail-qty button {
         min-width: 36px;
         min-height: 36px;
         cursor: pointer;
       }
+
       .detail-actions {
         display: flex;
         gap: 10px;
         margin-top: 16px;
       }
-      .detail-actions button { flex: 1; }
-      .detail-policy small { display: block; margin-top: 8px; }
+
+      .detail-actions button {
+        flex: 1;
+      }
+
+      .detail-policy small {
+        display: block;
+        margin-top: 8px;
+      }
+
       @media(max-width:480px) {
-        .detail-actions { flex-direction: column; }
+        .detail-actions {
+          flex-direction: column;
+        }
       }
     `;
-    document.head.appendChild(style);
 
+    document.head.appendChild(style);
     return modal;
   }
 
@@ -470,12 +520,19 @@
     const p = products.find(
       x => String(x.id) === String(id) && x.active !== false
     );
+
     if (!p) return;
 
     const config = sizeConfig(p);
-    const discount = p.oldPrice > p.price
-      ? Math.round((1 - p.price / p.oldPrice) * 100)
+    const price = Number(p.price) || 0;
+    const oldPrice = Number(p.oldPrice) || 0;
+
+    const discount = oldPrice > price
+      ? Math.round((1 - price / oldPrice) * 100)
       : 0;
+
+    const description = String(p.description || "").trim() ||
+      "Is product ki detailed description abhi add nahi ki gayi hai.";
 
     const modal = ensureDetailModal();
 
@@ -484,20 +541,27 @@
         src="${esc(validUrl(p.image) || placeholder)}"
         alt="${esc(p.title)}">
 
-      <p class="product-category">${esc(p.category)}</p>
+      <p class="product-category">${esc(p.category || "")}</p>
       <h2>${esc(p.title)}</h2>
 
       <div class="detail-price">
-        <span class="price-now">${money(p.price)}</span>
+        <span class="price-now">${money(price)}</span>
         ${
-          p.oldPrice > p.price
-            ? `<span class="price-old">${money(p.oldPrice)}</span>
+          oldPrice > price
+            ? `<span class="price-old">${money(oldPrice)}</span>
                <span class="discount">${discount}% off</span>`
             : ""
         }
       </div>
 
-      <p>${esc(p.description || "Product details coming soon.")}</p>
+      <h3>Product description</h3>
+      <p class="detail-description">${esc(description)}</p>
+
+      ${
+        p.tag
+          ? `<p><b>Offer:</b> ${esc(p.tag)}</p>`
+          : ""
+      }
 
       ${
         config ? `
@@ -521,11 +585,12 @@
       </div>
 
       <div class="detail-policy">
-        <h3>↩️ 10 Days Return, Replacement & Refund</h3>
-        <p>Eligible products ke liye delivery ke 10 din ke andar request karein.</p>
-        <p>Return ya replacement product ki eligibility aur condition ke adheen hoga.</p>
-        <p>Refund approval aur verification ke baad applicable process ke mutabik hoga.</p>
-        <small>*Terms and conditions apply. Sirf wahi policy advertise karein jo aap fulfil kar sakte hain.</small>
+        <h3>↩️ Return and replacement information</h3>
+        <p>Return eligibility product aur seller ki actual policy par depend karti hai.</p>
+        <p>Order karne se pehle product details aur applicable terms check karein.</p>
+        <small>
+          Website par wahi return/refund policy dikhayein jo aap sach mein provide karte hain.
+        </small>
       </div>
 
       <p><b>Payment:</b> UPI available · Cash on Delivery unavailable</p>
@@ -539,6 +604,7 @@
     `;
 
     const image = $(".detail-image");
+
     image.onerror = () => {
       image.onerror = null;
       image.src = placeholder;
@@ -561,6 +627,7 @@
       const selector = $(
         `[data-size-for="${CSS.escape(String(product.id))}"]`
       );
+
       size = selector ? selector.value : "";
     }
 
@@ -569,6 +636,8 @@
       return;
     }
 
+    const currentPrice = Number(product.price) || 0;
+
     const existing = cart.find(item =>
       String(item.id) === String(product.id) &&
       String(item.size || "") === size
@@ -576,11 +645,14 @@
 
     if (existing) {
       existing.qty += qty;
+      existing.price = currentPrice;
+      existing.title = product.title;
+      existing.image = product.image;
     } else {
       cart.push({
         id: product.id,
         title: product.title,
-        price: Number(product.price),
+        price: currentPrice,
         image: product.image,
         qty,
         size
@@ -588,6 +660,7 @@
     }
 
     saveC();
+    renderCart(false);
     toast("Cart mein add ho gaya");
 
     if (buyNow) openCheckout();
@@ -610,7 +683,10 @@
   }
 
   function renderCart(open = true) {
-    $("#cartItems").innerHTML = cart.length
+    const host = $("#cartItems");
+    if (!host) return;
+
+    host.innerHTML = cart.length
       ? cart.map(item => `
           <div class="cart-line">
             <img src="${esc(validUrl(item.image) || placeholder)}" alt="">
@@ -623,22 +699,50 @@
               <div class="qty-controls">
                 <button type="button" data-qty="${esc(item.id)}"
                   data-size="${esc(item.size || "")}" data-delta="-1">−</button>
-                <span>${item.qty}</span>
+                <span>${Number(item.qty) || 0}</span>
                 <button type="button" data-qty="${esc(item.id)}"
                   data-size="${esc(item.size || "")}" data-delta="1">+</button>
                 <button type="button" data-remove="${esc(item.id)}"
                   data-size="${esc(item.size || "")}">Remove</button>
               </div>
             </div>
-            <b>${money(item.price * item.qty)}</b>
+            <b>${money(Number(item.price || 0) * Number(item.qty || 0))}</b>
           </div>
         `).join("")
       : "<p class='muted'>Cart khaali hai.</p>";
 
-    $("#subtotal").textContent = money(total());
-    $("#checkoutOpen").disabled = !cart.length;
+    const subtotal = $("#subtotal");
+    const checkoutButton = $("#checkoutOpen");
+
+    if (subtotal) subtotal.textContent = money(total());
+    if (checkoutButton) checkoutButton.disabled = !cart.length;
 
     if (open) show("cartOverlay");
+  }
+
+  /*
+    When checkout starts, refresh cart item prices from the latest
+    saved product data so an edited product price is reflected.
+  */
+
+  function refreshCartPrices() {
+    cart = cart.map(item => {
+      const product = products.find(
+        p => String(p.id) === String(item.id)
+      );
+
+      if (!product) return item;
+
+      return {
+        ...item,
+        title: product.title,
+        price: Number(product.price) || 0,
+        image: product.image || placeholder
+      };
+    });
+
+    saveC();
+    renderCart(false);
   }
 
   /* CHECKOUT STEPS */
@@ -666,9 +770,13 @@
       return;
     }
 
+    refreshCartPrices();
+
     hide("cartOverlay");
     checkoutDraft = null;
-    $("#checkoutForm").reset();
+
+    const form = $("#checkoutForm");
+    if (form) form.reset();
 
     setCheckoutStep("address");
     show("checkoutOverlay");
@@ -704,6 +812,8 @@
       return;
     }
 
+    refreshCartPrices();
+
     const formData = new FormData(event.currentTarget);
     const address = readAddress(formData);
 
@@ -724,14 +834,20 @@
       reference: "MS" + Date.now().toString().slice(-10)
     };
 
-    $("#addressSummary").innerHTML = `
-      <b>Delivery to:</b><br>
-      ${esc(address.name)}<br>
-      ${esc(address.phone)}<br>
-      ${esc(formatAddress(address))}
-    `;
+    const summary = $("#addressSummary");
+    if (summary) {
+      summary.innerHTML = `
+        <b>Delivery to:</b><br>
+        ${esc(address.name)}<br>
+        ${esc(address.phone)}<br>
+        ${esc(formatAddress(address))}
+      `;
+    }
 
-    $("#paymentTotal").textContent = money(checkoutDraft.total);
+    const paymentTotal = $("#paymentTotal");
+    if (paymentTotal) {
+      paymentTotal.textContent = money(checkoutDraft.total);
+    }
 
     renderPayment();
     setCheckoutStep("payment");
@@ -740,10 +856,14 @@
   /* UPI PAYMENT AND DYNAMIC QR */
 
   function upiUri(amount, reference) {
-    if (!payment.upiId) return "";
+    const upiId = String(payment.upiId || "").trim();
+
+    if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
+      return "";
+    }
 
     return "upi://pay?" + new URLSearchParams({
-      pa: payment.upiId,
+      pa: upiId,
       pn: payment.merchantName || "Meesho Sale",
       am: Number(amount).toFixed(2),
       cu: "INR",
@@ -770,18 +890,25 @@
       ${
         uri ? `
           <div id="dynamicQr" class="qr-holder"></div>
-          <p class="muted">Scan this QR using a supported UPI app.</p>
+          <p class="muted">
+            Scan this dynamic QR using a supported UPI app.
+            Verify the amount shown in your UPI app before paying.
+          </p>
           <button id="copyUpi" class="plain full" type="button">
             Copy UPI payment link
           </button>
         ` : `
-          <p class="notice">UPI ID set nahi hai. Admin → UPI & QR mein payment details save karein.</p>
+          <p class="notice">
+            UPI ID set nahi hai. Admin → UPI & QR mein valid payment details save karein.
+          </p>
         `
       }
 
       ${
         staticQr ? `
-          <p class="muted">Merchant static QR (amount may not be pre-filled):</p>
+          <p class="muted">
+            Merchant static QR (amount may not be pre-filled):
+          </p>
           <div class="qr-holder">
             <img src="${esc(staticQr)}" alt="Merchant UPI QR">
           </div>
@@ -789,8 +916,8 @@
       }
 
       <p class="muted">
-        UPI payment is not automatically verified by this demo.
-        Admin must check the actual merchant payment record before marking
+        Payment is not automatically verified by this demo.
+        Admin must check actual merchant payment records before marking
         an order paid.
       </p>
     `;
@@ -804,14 +931,18 @@
         height: 190
       });
     } else if (qrHost) {
-      qrHost.textContent = "QR library unavailable. Use the UPI link button.";
+      qrHost.textContent =
+        "QR library unavailable. Use the UPI payment link.";
     }
 
     const payButton = $("#openUpiPayment");
-    payButton.disabled = !uri;
-    payButton.textContent = uri
-      ? "Pay " + money(amount) + " using UPI"
-      : "UPI not configured";
+
+    if (payButton) {
+      payButton.disabled = !uri;
+      payButton.textContent = uri
+        ? "Pay " + money(amount) + " using UPI"
+        : "UPI not configured";
+    }
 
     const copyButton = $("#copyUpi");
 
@@ -826,8 +957,11 @@
       });
     }
 
-    $("#paymentMessage").hidden = true;
-    $("#paymentDone").disabled = false;
+    const message = $("#paymentMessage");
+    const doneButton = $("#paymentDone");
+
+    if (message) message.hidden = true;
+    if (doneButton) doneButton.disabled = false;
   }
 
   function launchUpi() {
@@ -846,11 +980,11 @@
       return;
     }
 
-    // Opening a UPI app is not proof of payment.
+    // Opening a UPI app does not prove payment.
     window.location.href = uri;
   }
 
-  /* ORDER CREATION: ALWAYS PENDING UNTIL ADMIN VERIFIES */
+  /* ORDER CREATION: PENDING UNTIL ADMIN VERIFIES */
 
   function submitOrderForVerification() {
     if (!checkoutDraft || !cart.length) {
@@ -860,13 +994,12 @@
     }
 
     const address = checkoutDraft.address;
-    const formattedAddress = formatAddress(address);
 
     const order = {
       id: checkoutDraft.reference,
       name: address.name,
       phone: address.phone,
-      address: formattedAddress,
+      address: formatAddress(address),
       addressDetails: { ...address },
       items: checkoutDraft.items.map(item => ({
         id: item.id,
@@ -883,7 +1016,6 @@
       createdAt: new Date().toISOString()
     };
 
-    // Save the order before clearing the cart.
     const previousOrders = orders;
     orders = [order, ...orders];
 
@@ -898,16 +1030,24 @@
     renderCart(false);
     renderAdminOrders();
 
-    $("#confirmationOrderId").textContent = order.id;
-    $("#confirmationPaymentStatus").textContent =
-      "Pending verification";
-    $("#confirmationOrderStatus").textContent =
-      "Awaiting payment verification";
-    $("#confirmationTotal").textContent = money(order.total);
-    $("#confirmationTitle").textContent = "Order submitted";
-    $("#confirmationMessage").textContent =
-      "Your order has been saved. It is NOT confirmed yet. " +
-      "The admin must verify the payment against merchant records.";
+    const orderId = $("#confirmationOrderId");
+    const paymentStatus = $("#confirmationPaymentStatus");
+    const orderStatus = $("#confirmationOrderStatus");
+    const confirmationTotal = $("#confirmationTotal");
+    const confirmationTitle = $("#confirmationTitle");
+    const confirmationMessage = $("#confirmationMessage");
+
+    if (orderId) orderId.textContent = order.id;
+    if (paymentStatus) paymentStatus.textContent = "Pending verification";
+    if (orderStatus) orderStatus.textContent = "Awaiting payment verification";
+    if (confirmationTotal) confirmationTotal.textContent = money(order.total);
+    if (confirmationTitle) confirmationTitle.textContent = "Order submitted";
+
+    if (confirmationMessage) {
+      confirmationMessage.textContent =
+        "Your order has been saved. It is NOT confirmed yet. " +
+        "The admin must verify payment against actual merchant records.";
+    }
 
     setCheckoutStep("confirmation");
     toast("Order submitted for verification");
@@ -983,11 +1123,14 @@
   }
 
   function renderHistory(phone = "") {
+    const host = $("#historyResults");
+    if (!host) return;
+
     const matches = orders.filter(order =>
       String(order.phone || "") === phone
     );
 
-    $("#historyResults").innerHTML = matches.length
+    host.innerHTML = matches.length
       ? matches.map(order => card(order)).join("")
       : `<p class="muted">${
           phone
@@ -1005,22 +1148,205 @@
       : "<p class='muted'>No orders yet.</p>";
   }
 
+  /* ADMIN PRODUCTS: EDIT, SAVE, DELETE */
+
   function renderAdminProducts() {
     const count = $("#adminCount");
     const host = $("#adminProducts");
-    if (!count || !host) return;
 
-    count.textContent = products.length;
+    if (!host) return;
 
-    host.innerHTML = products.map(product => `
-      <div class="admin-product">
-        <span>
-          <b>${esc(product.title)}</b><br>
-          ${money(product.price)} · ${esc(product.category)}
-        </span>
-        <button type="button" data-delprod="${esc(product.id)}">Delete</button>
-      </div>
-    `).join("");
+    if (count) count.textContent = products.length;
+
+    host.innerHTML = products.map(product => {
+      const isEditing =
+        String(product.id) === String(editingProductId);
+
+      if (isEditing) {
+        return `
+          <div class="admin-product admin-product-edit">
+            <form data-edit-product-form="${esc(product.id)}">
+              <h3>Edit Product</h3>
+
+              <label>
+                Product name
+                <input name="title"
+                  value="${esc(product.title || "")}" required>
+              </label>
+
+              <label>
+                Category
+                <input name="category"
+                  value="${esc(product.category || "")}" required>
+              </label>
+
+              <label>
+                Selling price (₹)
+                <input name="price" type="number" min="1" step="0.01"
+                  value="${Number(product.price) || 0}" required>
+              </label>
+
+              <label>
+                Old price / MRP (₹)
+                <input name="oldPrice" type="number" min="0" step="0.01"
+                  value="${Number(product.oldPrice) || 0}" required>
+              </label>
+
+              <label>
+                Product tag
+                <input name="tag" value="${esc(product.tag || "")}">
+              </label>
+
+              <label>
+                Product image URL
+                <input name="image" type="url"
+                  value="${esc(product.image || "")}">
+              </label>
+
+              <label>
+                Description
+                <textarea name="description" rows="4">${esc(product.description || "")}</textarea>
+              </label>
+
+              <label>
+                Size type (auto, clothes, shoes, sandals, bra, none)
+                <input name="sizeType"
+                  value="${esc(product.sizeType || "auto")}">
+              </label>
+
+              <label>
+                Available sizes (comma-separated)
+                <input name="availableSizes"
+                  value="${esc(Array.isArray(product.availableSizes)
+                    ? product.availableSizes.join(", ")
+                    : product.availableSizes || "")}">
+              </label>
+
+              <div class="admin-edit-actions">
+                <button type="submit" class="primary">Save Changes</button>
+                <button type="button" data-cancel-edit>Cancel</button>
+              </div>
+            </form>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="admin-product">
+          <div class="admin-product-info">
+            <b>${esc(product.title || "Product")}</b><br>
+            <span>${esc(product.category || "")}</span><br>
+            <strong>Price: ${money(product.price)}</strong>
+            ${
+              Number(product.oldPrice) > Number(product.price)
+                ? `<br><small>Old price: ${money(product.oldPrice)}</small>`
+                : ""
+            }
+          </div>
+
+          <div class="admin-product-actions">
+            <button type="button" data-editprod="${esc(product.id)}">
+              Edit / Change Price
+            </button>
+            <button type="button" data-delprod="${esc(product.id)}">
+              Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function saveEditedProduct(event, form) {
+    event.preventDefault();
+
+    const id = form.dataset.editProductForm;
+
+    const product = products.find(
+      item => String(item.id) === String(id)
+    );
+
+    if (!product) {
+      toast("Product nahi mila. Refresh karke dobara try karein.");
+      return;
+    }
+
+    const data = new FormData(form);
+
+    const title = String(data.get("title") || "").trim();
+    const category = String(data.get("category") || "").trim();
+    const price = Number(data.get("price"));
+    const oldPrice = Number(data.get("oldPrice"));
+    const tag = String(data.get("tag") || "").trim();
+    const image = String(data.get("image") || "").trim();
+    const description = String(data.get("description") || "").trim();
+    const sizeType = String(data.get("sizeType") || "auto")
+      .trim().toLowerCase();
+
+    const sizes = String(data.get("availableSizes") || "")
+      .split(",")
+      .map(value => value.trim())
+      .filter(Boolean);
+
+    if (!title || !category) {
+      toast("Product name aur category bharo.");
+      return;
+    }
+
+    if (!Number.isFinite(price) || price < 1) {
+      toast("Valid selling price enter karo.");
+      return;
+    }
+
+    if (!Number.isFinite(oldPrice) || oldPrice < 0) {
+      toast("Valid old price enter karo.");
+      return;
+    }
+
+    if (image && !validUrl(image)) {
+      toast("Image ke liye valid http/https URL enter karo.");
+      return;
+    }
+
+    const previous = { ...product };
+
+    product.title = title;
+    product.category = category;
+    product.price = price;
+    product.oldPrice = oldPrice;
+    product.tag = tag || "SALE";
+    product.image = validUrl(image) || placeholder;
+    product.description = description;
+    product.sizeType = sizeType || "auto";
+    product.availableSizes = sizes;
+
+    if (!saveP()) {
+      Object.assign(product, previous);
+      return;
+    }
+
+    editingProductId = null;
+
+    /*
+      Update matching cart entries with the latest product price.
+      Checkout also refreshes cart prices before calculating the total.
+    */
+    cart = cart.map(item => {
+      if (String(item.id) !== String(product.id)) return item;
+
+      return {
+        ...item,
+        title: product.title,
+        price: Number(product.price),
+        image: product.image
+      };
+    });
+
+    saveC();
+    renderProducts();
+    renderCart(false);
+
+    toast("Product aur price successfully update ho gayi!");
   }
 
   /* ADMIN TABS */
@@ -1034,12 +1360,17 @@
       panel.hidden = panel.dataset.panel !== name;
     });
 
+    if (name === "products") renderAdminProducts();
+
     if (name === "payments") {
       const form = $("#paymentForm");
-      form.elements.merchantName.value =
-        payment.merchantName || "Meesho Sale";
-      form.elements.upiId.value = payment.upiId || "";
-      form.elements.qrImage.value = payment.qrImage || "";
+
+      if (form) {
+        form.elements.merchantName.value =
+          payment.merchantName || "Meesho Sale";
+        form.elements.upiId.value = payment.upiId || "";
+        form.elements.qrImage.value = payment.qrImage || "";
+      }
     }
 
     if (name === "orders") renderAdminOrders();
@@ -1048,6 +1379,22 @@
   /* CLICK ACTIONS */
 
   document.addEventListener("click", event => {
+    const editButton = event.target.closest("[data-editprod]");
+
+    if (editButton) {
+      editingProductId = editButton.dataset.editprod;
+      renderAdminProducts();
+      return;
+    }
+
+    const cancelEdit = event.target.closest("[data-cancel-edit]");
+
+    if (cancelEdit) {
+      editingProductId = null;
+      renderAdminProducts();
+      return;
+    }
+
     const detailButton = event.target.closest(
       "[data-detail-add], [data-detail-buy]"
     );
@@ -1057,8 +1404,10 @@
         detailButton.dataset.detailBuy;
 
       const product = products.find(
-        item => String(item.id) === String(id)
+        item => String(item.id) === String(id) &&
+          item.active !== false
       );
+
       if (!product) return;
 
       const config = sizeConfig(product);
@@ -1082,6 +1431,7 @@
 
     if (detailQty) {
       const qty = $("#detailQty");
+
       if (qty) {
         qty.textContent = Math.max(
           1,
@@ -1089,6 +1439,7 @@
             Number(detailQty.dataset.detailQty)
         );
       }
+
       return;
     }
 
@@ -1103,11 +1454,16 @@
 
     if (productButton) {
       const id = productButton.dataset.add || productButton.dataset.buy;
+
       const product = products.find(
-        item => String(item.id) === String(id)
+        item => String(item.id) === String(id) &&
+          item.active !== false
       );
 
-      if (product) add(product, Boolean(productButton.dataset.buy));
+      if (product) {
+        add(product, Boolean(productButton.dataset.buy));
+      }
+
       return;
     }
 
@@ -1124,6 +1480,7 @@
       }
 
       cart = cart.filter(item => item.qty > 0);
+
       saveC();
       renderCart(false);
       return;
@@ -1157,13 +1514,23 @@
     const deleteProduct = event.target.closest("[data-delprod]");
 
     if (deleteProduct) {
+      const id = deleteProduct.dataset.delprod;
+
+      if (!confirm("Is product ko delete karna hai?")) return;
+
       products = products.filter(
-        product => String(product.id) !== String(deleteProduct.dataset.delprod)
+        product => String(product.id) !== String(id)
       );
 
-      saveP();
-      renderProducts();
-      toast("Product deleted");
+      if (String(editingProductId) === String(id)) {
+        editingProductId = null;
+      }
+
+      if (saveP()) {
+        renderProducts();
+        toast("Product deleted");
+      }
+
       return;
     }
 
@@ -1187,6 +1554,7 @@
         renderAdminOrders();
         toast("Payment marked verified. Order confirmed.");
       }
+
       return;
     }
 
@@ -1203,6 +1571,7 @@
         renderAdminOrders();
         toast("Order marked pending");
       }
+
       return;
     }
 
@@ -1220,6 +1589,7 @@
         renderAdminOrders();
         toast("Order cancelled");
       }
+
       return;
     }
 
@@ -1228,6 +1598,15 @@
     if (tabButton) {
       tab(tabButton.dataset.tab);
     }
+  });
+
+  /* SAVE PRODUCT EDIT FORM */
+
+  document.addEventListener("submit", event => {
+    const form = event.target.closest("[data-edit-product-form]");
+    if (!form) return;
+
+    saveEditedProduct(event, form);
   });
 
   /* KEYBOARD ACCESS */
@@ -1246,20 +1625,21 @@
 
   /* SEARCH, SORT AND CATEGORIES */
 
-  $("#search").addEventListener("input", event => {
+  $("#search")?.addEventListener("input", event => {
     term = event.target.value.trim().toLowerCase();
     renderProducts();
   });
 
-  $("#clear").addEventListener("click", () => {
-    $("#search").value = "";
+  $("#clear")?.addEventListener("click", () => {
+    if ($("#search")) $("#search").value = "";
+
     term = "";
     renderProducts();
   });
 
-  $("#sort").addEventListener("change", renderProducts);
+  $("#sort")?.addEventListener("change", renderProducts);
 
-  $("#categories").addEventListener("click", event => {
+  $("#categories")?.addEventListener("click", event => {
     const button = event.target.closest("[data-cat]");
     if (!button) return;
 
@@ -1272,10 +1652,11 @@
     renderProducts();
   });
 
-  $("#reset").addEventListener("click", () => {
+  $("#reset")?.addEventListener("click", () => {
     cat = "All";
     term = "";
-    $("#search").value = "";
+
+    if ($("#search")) $("#search").value = "";
 
     $$("[data-cat]").forEach(button => {
       button.classList.toggle("active", button.dataset.cat === "All");
@@ -1286,42 +1667,46 @@
 
   /* CART AND CHECKOUT BUTTONS */
 
-  $("#cartOpen").addEventListener("click", () => renderCart(true));
-  $("#checkoutOpen").addEventListener("click", openCheckout);
+  $("#cartOpen")?.addEventListener("click", () => renderCart(true));
 
-  $("#checkoutForm").addEventListener("submit", continueToPayment);
+  $("#checkoutOpen")?.addEventListener("click", openCheckout);
 
-  $("#openUpiPayment").addEventListener("click", launchUpi);
+  $("#checkoutForm")?.addEventListener("submit", continueToPayment);
 
-  $("#paymentDone").addEventListener("click", () => {
+  $("#openUpiPayment")?.addEventListener("click", launchUpi);
+
+  $("#paymentDone")?.addEventListener("click", () => {
     if (!checkoutDraft) {
       toast("Checkout dobara start karein");
       return;
     }
 
     const message = $("#paymentMessage");
-    message.textContent =
-      "Order submit hoga aur Payment Pending rahega. " +
-      "Admin actual merchant payment records check karke hi verify karega.";
-    message.hidden = false;
+
+    if (message) {
+      message.textContent =
+        "Order submit hoga aur Payment Pending rahega. " +
+        "Admin actual merchant payment records check karke hi verify karega.";
+      message.hidden = false;
+    }
 
     submitOrderForVerification();
   });
 
-  $("#backToAddress").addEventListener("click", () => {
+  $("#backToAddress")?.addEventListener("click", () => {
     setCheckoutStep("address");
   });
 
-  $("#confirmationDone").addEventListener("click", closeConfirmation);
+  $("#confirmationDone")?.addEventListener("click", closeConfirmation);
 
   /* ORDER HISTORY */
 
-  $("#historyOpen").addEventListener("click", () => {
+  $("#historyOpen")?.addEventListener("click", () => {
     renderHistory();
     show("historyOverlay");
   });
 
-  $("#historyLookup").addEventListener("submit", event => {
+  $("#historyLookup")?.addEventListener("submit", event => {
     event.preventDefault();
 
     const phone = String(
@@ -1333,14 +1718,18 @@
 
   /* ADMIN LOGIN */
 
-  $("#adminOpen").addEventListener("click", () => {
+  $("#adminOpen")?.addEventListener("click", () => {
     show("adminOverlay");
-    $("#adminForm").hidden = false;
-    $("#adminTools").hidden = true;
-    $("#adminForm").reset();
+
+    if ($("#adminForm")) {
+      $("#adminForm").hidden = false;
+      $("#adminForm").reset();
+    }
+
+    if ($("#adminTools")) $("#adminTools").hidden = true;
   });
 
-  $("#adminForm").addEventListener("submit", event => {
+  $("#adminForm")?.addEventListener("submit", event => {
     event.preventDefault();
 
     if (event.currentTarget.elements.pin.value !== PIN) {
@@ -1349,28 +1738,46 @@
     }
 
     event.currentTarget.hidden = true;
-    $("#adminTools").hidden = false;
+
+    if ($("#adminTools")) $("#adminTools").hidden = false;
+
     tab("products");
   });
 
   /* ADD PRODUCT */
 
-  $("#addForm").addEventListener("submit", event => {
+  $("#addForm")?.addEventListener("submit", event => {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
     const title = String(formData.get("title") || "").trim();
+    const category = String(formData.get("category") || "").trim();
+    const price = Number(formData.get("price"));
+    const oldPrice = Number(formData.get("oldPrice")) || 0;
 
-    if (!title) return;
+    if (!title || !category) {
+      toast("Product name aur category bharo.");
+      return;
+    }
+
+    if (!Number.isFinite(price) || price < 1) {
+      toast("Valid selling price enter karo.");
+      return;
+    }
+
+    if (!Number.isFinite(oldPrice) || oldPrice < 0) {
+      toast("Valid old price enter karo.");
+      return;
+    }
 
     products.unshift({
       id: "p" + Date.now(),
       title,
-      price: Number(formData.get("price")),
-      oldPrice: Number(formData.get("oldPrice")) || 0,
-      category: String(formData.get("category")),
+      price,
+      oldPrice,
+      category,
       image: validUrl(String(formData.get("image") || "")) || placeholder,
-      description: String(formData.get("description") || ""),
+      description: String(formData.get("description") || "").trim(),
       sizeType: String(formData.get("sizeType") || "auto"),
       availableSizes: String(formData.get("availableSizes") || "")
         .split(",")
@@ -1389,10 +1796,13 @@
 
   /* RESTORE DEMO PRODUCTS */
 
-  $("#resetDemo").addEventListener("click", () => {
-    if (!confirm("Restore demo products?")) return;
+  $("#resetDemo")?.addEventListener("click", () => {
+    if (!confirm("Restore demo products? This will replace current products.")) {
+      return;
+    }
 
     products = defaults.map(product => ({ ...product }));
+    editingProductId = null;
 
     if (saveP()) {
       renderProducts();
@@ -1402,16 +1812,23 @@
 
   /* UPI AND QR SETTINGS */
 
-  $("#paymentForm").addEventListener("submit", event => {
+  $("#paymentForm")?.addEventListener("submit", event => {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
     const upiId = String(formData.get("upiId") || "").trim();
     const merchantName = String(formData.get("merchantName") || "").trim();
-    const qrImage = validUrl(String(formData.get("qrImage") || ""));
+    const qrImageText = String(formData.get("qrImage") || "").trim();
+
+    const qrImage = qrImageText ? validUrl(qrImageText) : "";
 
     if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
       toast("Valid UPI ID enter karein, e.g. name@bank");
+      return;
+    }
+
+    if (qrImageText && !qrImage) {
+      toast("QR image ke liye valid http/https URL enter karein.");
       return;
     }
 
@@ -1428,7 +1845,9 @@
 
   /* INITIAL LOAD */
 
-  $("#year").textContent = new Date().getFullYear();
+  if ($("#year")) {
+    $("#year").textContent = new Date().getFullYear();
+  }
 
   renderProducts();
   saveC();
