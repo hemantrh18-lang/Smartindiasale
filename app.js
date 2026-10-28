@@ -1647,12 +1647,22 @@ if (deleteProduct) {
       }
 
       // Delete the product from Supabase.
-      const { error: deleteError } = await supabaseClient
-        .from("products")
-        .delete()
-        .eq("id", id);
+    const { data: deletedRows, error: deleteError } =
+  await supabaseClient
+    .from("products")
+    .delete()
+    .eq("id", id)
+    .select("id, name");
 
-      if (deleteError) throw deleteError;
+if (deleteError) throw deleteError;
+
+if (!deletedRows || deletedRows.length === 0) {
+  throw new Error(
+    "Koi row delete nahi hui. ID ya Supabase DELETE permission/RLS check karni hogi."
+  );
+}
+
+console.log("Supabase deleted rows:", deletedRows);
 
       // Reload products to verify the deletion.
       const { data: rows, error: loadError } = await supabaseClient
