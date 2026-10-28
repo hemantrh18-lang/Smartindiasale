@@ -1772,31 +1772,67 @@
 
   /* ADMIN LOGIN */
 
-  $("#adminOpen")?.addEventListener("click", () => {
-    show("adminOverlay");
 
-    if ($("#adminForm")) {
-      $("#adminForm").hidden = false;
-      $("#adminForm").reset();
-    }
+$("#adminOpen")?.addEventListener("click", async () => {
+  show("adminOverlay");
 
-    if ($("#adminTools")) $("#adminTools").hidden = true;
-  });
+  const { data: { session } } =
+    await supabaseClient.auth.getSession();
 
-  $("#adminForm")?.addEventListener("submit", event => {
-    event.preventDefault();
+  if (session) {
+    const { data: isAdmin, error } =
+      await supabaseClient.rpc("is_admin");
 
-    if (event.currentTarget.elements.pin.value !== PIN) {
-      toast("Admin PIN galat");
+    if (!error && isAdmin === true) {
+      $("#adminForm").hidden = true;
+      $("#adminTools").hidden = false;
+      tab("products");
       return;
     }
+  }
 
-    event.currentTarget.hidden = true;
+  if ($("#adminForm")) {
+    $("#adminForm").hidden = false;
+    $("#adminForm").reset();
+  }
 
-    if ($("#adminTools")) $("#adminTools").hidden = false;
+  if ($("#adminTools")) {
+    $("#adminTools").hidden = true;
+  }
+});
 
-    tab("products");
-  });
+$("#adminForm")?.addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const email = form.elements.email.value.trim();
+  const password = form.elements.password.value;
+
+  const { data, error } =
+    await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+  if (error) {
+    toast("Login failed: " + error.message);
+    return;
+  }
+
+  const { data: isAdmin, error: roleError } =
+    await supabaseClient.rpc("is_admin");
+
+  if (roleError || isAdmin !== true) {
+    await supabaseClient.auth.signOut();
+    toast("Admin permission nahi mili");
+    return;
+  }
+
+  form.hidden = true;
+  $("#adminTools").hidden = false;
+  tab("products");
+  toast("Admin login successful");
+});
 
   /* ADD PRODUCT */
 
