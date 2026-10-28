@@ -135,6 +135,53 @@
     qrImage: ""
   });
 
+  // Convert Supabase database columns into the website format
+  function mapDatabaseProduct(row) {
+    return {
+      id: row.id,
+      title: row.name || "Untitled Product",
+      category: row.category || "Other",
+      price: Number(row.price) || 0,
+      oldPrice: Number(row.original_price) || 0,
+      tag: "SALE",
+      image: validUrl(row.image_url) || placeholder,
+      description: row.description || "",
+      active: row.active !== false,
+      stock: Number(row.stock) || 0
+    };
+  }
+
+  // Load products from Supabase
+  async function loadProductsFromSupabase() {
+    try {
+      const { data, error } = await supabaseClient
+        .from("products")
+        .select(
+          "id, name, category, price, original_price, image_url, description, stock, active"
+        )
+        .order("id", { ascending: true });
+
+      if (error) throw error;
+
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error("No products returned by Supabase");
+      }
+
+      products = data.map(mapDatabaseProduct);
+
+      // Keep a local cache for the next page load
+      saveP();
+
+      renderProducts();
+      console.log("Supabase products loaded:", products.length);
+    } catch (error) {
+      console.error("Supabase product loading failed:", error);
+      toast(
+        "Database se products load nahi hue. Console mein error check karein."
+      );
+    }
+  }
+
   let cat = "All";
   let term = "";
   let checkoutDraft = null;
@@ -1857,6 +1904,8 @@
   }
 
   renderProducts();
-  saveC();
-  renderCart(false);
+saveC();
+renderCart(false);
+
+loadProductsFromSupabase();
 })();
