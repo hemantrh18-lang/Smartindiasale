@@ -263,12 +263,33 @@
         Data is stored in this browser.
       </p>
 
-      <form id="adminForm">
-        <label>Demo PIN
-          <input name="pin" type="password" required placeholder="PIN">
-        </label>
-        <button class="primary full" type="submit">Unlock admin</button>
-      </form>
+      
+<form id="adminForm">
+  <label>Email
+    <input
+      name="email"
+      type="email"
+      autocomplete="username"
+      required
+      placeholder="meesho@sale.com"
+    >
+  </label>
+
+  <label>Password
+    <input
+      name="password"
+      type="password"
+      autocomplete="current-password"
+      required
+      placeholder="Supabase account password"
+    >
+  </label>
+
+  <button class="primary full" type="submit">
+    Login to admin
+  </button>
+</form>
+
 
       <div id="adminTools" hidden>
         <nav class="tabs">
