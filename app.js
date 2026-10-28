@@ -1311,97 +1311,148 @@
     }).join("");
   }
 
-  function saveEditedProduct(event, form) {
-    event.preventDefault();
+  
+async function saveEditedProduct(event, form) {
+  event.preventDefault();
 
-    const id = form.dataset.editProductForm;
+  const id = form.dataset.editProductForm;
+  const product = products.find(
+    item => String(item.id) === String(id)
+  );
 
-    const product = products.find(
+  if (!product) {
+    toast("Product nahi mila. Refresh karke try karein.");
+    return;
+  }
+
+  const data = new FormData(form);
+
+  const title = String(data.get("title") || "").trim();
+  const category = String(data.get("category") || "").trim();
+  const price = Number(data.get("price"));
+  const oldPrice = Number(data.get("oldPrice"));
+  const tag = String(data.get("tag") || "").trim();
+  const imageText = String(data.get("image") || "").trim();
+  const description = String(data.get("description") || "").trim();
+
+  const sizeType = String(data.get("sizeType") || "auto")
+    .trim().toLowerCase();
+
+  const sizes = String(data.get("availableSizes") || "")
+    .split(",")
+    .map(value => value.trim())
+    .filter(Boolean);
+
+  if (!title || !category) {
+    toast("Product name aur category bharo.");
+    return;
+  }
+
+  if (!Number.isFinite(price) || price < 1) {
+    toast("Valid selling price enter karo.");
+    return;
+  }
+
+  if (!Number.isFinite(oldPrice) || oldPrice < 0) {
+    toast("Valid old price enter karo.");
+    return;
+  }
+
+  const image = imageText ? validUrl(imageText) : placeholder;
+
+  if (imageText && !image) {
+    toast("Valid http/https image URL enter karo.");
+    return;
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabaseClient.auth.getSession();
+
+  if (sessionError || !sessionData.session) {
+    toast("Admin login expire ho gaya. Dobara login karo.");
+    return;
+  }
+
+  const { data: isAdmin, error: roleError } =
+    await supabaseClient.rpc("is_admin");
+
+  if (roleError || isAdmin !== true) {
+    toast("Admin permission verify nahi hui.");
+    return;
+  }
+
+  const submitButton = form.querySelector('button[type="submit"]');
+  if (submitButton) submitButton.disabled = true;
+
+  try {
+    const { error: updateError } = await supabaseClient
+      .from("products")
+      .update({
+        name: title,
+        category,
+        price,
+        original_price: oldPrice,
+        image_url: image,
+        description
+      })
+      .eq("id", id);
+
+    if (updateError) throw updateError;
+
+    const { data: rows, error: loadError } = await supabaseClient
+      .from("products")
+      .select(
+        "id, name, category, price, original_price, image_url, description, stock, active"
+      )
+      .order("id", { ascending: true });
+
+    if (loadError) throw loadError;
+
+    products = (rows || []).map(mapDatabaseProduct);
+
+    // Keep these display settings for the current browser session.
+    const updatedProduct = products.find(
       item => String(item.id) === String(id)
     );
 
-    if (!product) {
-      toast("Product nahi mila. Refresh karke dobara try karein.");
-      return;
-    }
-
-    const data = new FormData(form);
-
-    const title = String(data.get("title") || "").trim();
-    const category = String(data.get("category") || "").trim();
-    const price = Number(data.get("price"));
-    const oldPrice = Number(data.get("oldPrice"));
-    const tag = String(data.get("tag") || "").trim();
-    const image = String(data.get("image") || "").trim();
-    const description = String(data.get("description") || "").trim();
-    const sizeType = String(data.get("sizeType") || "auto")
-      .trim().toLowerCase();
-
-    const sizes = String(data.get("availableSizes") || "")
-      .split(",")
-      .map(value => value.trim())
-      .filter(Boolean);
-
-    if (!title || !category) {
-      toast("Product name aur category bharo.");
-      return;
-    }
-
-    if (!Number.isFinite(price) || price < 1) {
-      toast("Valid selling price enter karo.");
-      return;
-    }
-
-    if (!Number.isFinite(oldPrice) || oldPrice < 0) {
-      toast("Valid old price enter karo.");
-      return;
-    }
-
-    if (image && !validUrl(image)) {
-      toast("Image ke liye valid http/https URL enter karo.");
-      return;
-    }
-
-    const previous = { ...product };
-
-    product.title = title;
-    product.category = category;
-    product.price = price;
-    product.oldPrice = oldPrice;
-    product.tag = tag || "SALE";
-    product.image = validUrl(image) || placeholder;
-    product.description = description;
-    product.sizeType = sizeType || "auto";
-    product.availableSizes = sizes;
-
-    if (!saveP()) {
-      Object.assign(product, previous);
-      return;
+    if (updatedProduct) {
+      updatedProduct.tag = tag || "SALE";
+      updatedProduct.sizeType = sizeType || "auto";
+      updatedProduct.availableSizes = sizes;
     }
 
     editingProductId = null;
 
-    /*
-      Update matching cart entries with the latest product price.
-      Checkout also refreshes cart prices before calculating the total.
-    */
-    cart = cart.map(item => {
-      if (String(item.id) !== String(product.id)) return item;
+    saveP();
 
-      return {
-        ...item,
-        title: product.title,
-        price: Number(product.price),
-        image: product.image
-      };
+    cart = cart.map(item => {
+      const latest = products.find(
+        p => String(p.id) === String(item.id)
+      );
+
+      return latest
+        ? {
+            ...item,
+            title: latest.title,
+            price: Number(latest.price),
+            image: latest.image
+          }
+        : item;
     });
 
     saveC();
     renderProducts();
     renderCart(false);
 
-    toast("Product aur price successfully update ho gayi!");
+    toast("Product aur price database mein update ho gaye!");
+
+  } catch (error) {
+    console.error("Product update failed:", error);
+    toast("Update nahi hua: " + error.message);
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
+}
 
   /* ADMIN TABS */
 
