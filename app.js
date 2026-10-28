@@ -1616,28 +1616,86 @@ async function saveEditedProduct(event, form) {
       return;
     }
 
-    const deleteProduct = event.target.closest("[data-delprod]");
 
-    if (deleteProduct) {
-      const id = deleteProduct.dataset.delprod;
+const deleteProduct = event.target.closest("[data-delprod]");
 
-      if (!confirm("Is product ko delete karna hai?")) return;
+if (deleteProduct) {
+  const id = deleteProduct.dataset.delprod;
 
-      products = products.filter(
-        product => String(product.id) !== String(id)
-      );
+  if (!confirm("Is product ko database se permanently delete karna hai?")) {
+    return;
+  }
 
-      if (String(editingProductId) === String(id)) {
-        editingProductId = null;
+  deleteProduct.disabled = true;
+
+  (async () => {
+    try {
+      // Confirm that an admin session exists.
+      const { data: sessionData, error: sessionError } =
+        await supabaseClient.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Admin login expire ho gaya. Dobara login karein.");
       }
 
-      if (saveP()) {
-        renderProducts();
-        toast("Product deleted");
+      // Verify admin permission.
+      const { data: isAdmin, error: roleError } =
+        await supabaseClient.rpc("is_admin");
+
+      if (roleError || isAdmin !== true) {
+        throw new Error("Admin permission verify nahi hui.");
       }
 
-      return;
+      // Delete the product from Supabase.
+      const { error: deleteError } = await supabaseClient
+        .from("products")
+        .delete()
+        .eq("id", id);
+
+      if (deleteError) throw deleteError;
+
+      // Reload products to verify the deletion.
+      const { data: rows, error: loadError } = await supabaseClient
+        .from("products")
+        .select(
+          "id, name, category, price, original_price, image_url, description, stock, active"
+        )
+        .order("id", { ascending: true });
+
+      if (loadError) throw loadError;
+
+      if ((rows || []).some(row => String(row.id) === String(id))) {
+        throw new Error(
+          "Product database mein abhi bhi hai. RLS policy check karein."
+        );
+      }
+
+      // Refresh the website from the database.
+      products = (rows || []).map(mapDatabaseProduct);
+      editingProductId = null;
+
+      // Remove deleted product from the current browser cart too.
+      cart = cart.filter(item => String(item.id) !== String(id));
+
+      saveP();
+      saveC();
+      renderProducts();
+      renderCart(false);
+
+      toast("Product database se delete ho gaya!");
+
+    } catch (error) {
+      console.error("Product delete failed:", error);
+      toast("Delete nahi hua: " + error.message);
+    } finally {
+      if (deleteProduct.isConnected) {
+        deleteProduct.disabled = false;
+      }
     }
+  })();
+
+  return;
+}
 
     const markPaid = event.target.closest("[data-paid]");
 
