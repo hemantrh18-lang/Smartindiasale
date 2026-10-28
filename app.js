@@ -1663,7 +1663,7 @@ if (!deletedRows || deletedRows.length === 0) {
 }
 
 console.log("Supabase deleted rows:", deletedRows);
-
+toast("Delete response: " + JSON.stringify(deletedRows));
       // Reload products to verify the deletion.
       const { data: rows, error: loadError } = await supabaseClient
         .from("products")
