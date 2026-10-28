@@ -1834,16 +1834,30 @@ $("#adminForm")?.addEventListener("submit", async event => {
   toast("Admin login successful");
 });
 
-  /* ADD PRODUCT */
 
-  $("#addForm")?.addEventListener("submit", event => {
+  /* ADD PRODUCT — SAVE TO SUPABASE */
+
+  $("#addForm")?.addEventListener("submit", async event => {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const submitButton = form.querySelector(
+      'button[type="submit"]'
+    );
+
+    const formData = new FormData(form);
     const title = String(formData.get("title") || "").trim();
     const category = String(formData.get("category") || "").trim();
     const price = Number(formData.get("price"));
     const oldPrice = Number(formData.get("oldPrice")) || 0;
+    const imageText = String(formData.get("image") || "").trim();
+    const image = imageText
+      ? validUrl(imageText)
+      : "";
+
+    const description = String(
+      formData.get("description") || ""
+    ).trim();
 
     if (!title || !category) {
       toast("Product name aur category bharo.");
@@ -1860,27 +1874,75 @@ $("#adminForm")?.addEventListener("submit", async event => {
       return;
     }
 
-    products.unshift({
-      id: "p" + Date.now(),
-      title,
-      price,
-      oldPrice,
-      category,
-      image: validUrl(String(formData.get("image") || "")) || placeholder,
-      description: String(formData.get("description") || "").trim(),
-      sizeType: String(formData.get("sizeType") || "auto"),
-      availableSizes: String(formData.get("availableSizes") || "")
-        .split(",")
-        .map(value => value.trim())
-        .filter(Boolean),
-      tag: "NEW",
-      active: true
-    });
+    if (imageText && !image) {
+      toast("Valid http/https image URL enter karo.");
+      return;
+    }
 
-    if (saveP()) {
+    const { data: sessionData, error: sessionError } =
+      await supabaseClient.auth.getSession();
+
+    if (sessionError || !sessionData.session) {
+      toast("Admin login expire ho gaya. Dobara login karo.");
+      return;
+    }
+
+    const { data: isAdmin, error: roleError } =
+      await supabaseClient.rpc("is_admin");
+
+    if (roleError || isAdmin !== true) {
+      toast("Admin permission verify nahi hui.");
+      return;
+    }
+
+    if (submitButton) submitButton.disabled = true;
+
+    try {
+      const { data: inserted, error: insertError } =
+        await supabaseClient
+          .from("products")
+          .insert({
+            name: title,
+            category,
+            price,
+            original_price: oldPrice,
+            image_url: image || placeholder,
+            description,
+            stock: 0,
+            active: true
+          })
+          .select(
+            "id, name, category, price, original_price, image_url, description, stock, active"
+          )
+          .single();
+
+      if (insertError) throw insertError;
+
+      const { data, error: loadError } =
+        await supabaseClient
+          .from("products")
+          .select(
+            "id, name, category, price, original_price, image_url, description, stock, active"
+          )
+          .order("id", { ascending: true });
+
+      if (loadError) throw loadError;
+
+      products = (data || []).map(mapDatabaseProduct);
+      editingProductId = null;
+
+      saveP();
       renderProducts();
-      event.currentTarget.reset();
-      toast("Product added");
+      form.reset();
+
+      toast("Product Supabase database mein save ho gaya!");
+      console.log("Product saved to Supabase:", inserted.id);
+
+    } catch (error) {
+      console.error("Product save failed:", error);
+      toast("Product save nahi hua: " + error.message);
+    } finally {
+      if (submitButton) submitButton.disabled = false;
     }
   });
 
