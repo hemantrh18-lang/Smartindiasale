@@ -137,27 +137,55 @@
 
   // Convert Supabase database columns into the website format
   function mapDatabaseProduct(row) {
-    return {
-      id: row.id,
-      title: row.name || "Untitled Product",
-      category: row.category || "Other",
-      price: Number(row.price) || 0,
-      oldPrice: Number(row.original_price) || 0,
-      tag: "SALE",
-      image: validUrl(row.image_url) || placeholder,
-      description: row.description || "",
-      active: row.active !== false,
-      stock: Number(row.stock) || 0
-    };
-  }
+  return {
+    id: row.id,
+    title: row.name || "Untitled Product",
+    category: row.category || "Other",
+    price: Number(row.price) || 0,
+    oldPrice: Number(row.original_price) || 0,
+    tag: "SALE",
+    image: validUrl(row.image_url) || placeholder,
+    description: row.description || "",
+    active: row.active !== false,
+    stock: Number(row.stock) || 0,
+    rating: Number(row.rating) || 0,
+    ratingCount: Number(row.rating_count) || 0,
+    ratingVisible: row.rating_visible === true
+  };
+}
 
+function ratingMarkup(product) {
+  if (
+    product.ratingVisible !== true ||
+    !(Number(product.rating) > 0)
+  ) return "";
+
+  const rating = Math.max(0, Math.min(5, Number(product.rating)));
+  const count = Math.max(0, Number(product.ratingCount) || 0);
+  const fullStars = Math.floor(rating);
+  const halfStar = rating - fullStars >= 0.5 ? 1 : 0;
+  const emptyStars = 5 - fullStars - halfStar;
+
+  const stars =
+    "★".repeat(fullStars) +
+    (halfStar ? "½" : "") +
+    "☆".repeat(emptyStars);
+
+  return `
+    <div class="product-rating">
+      <span class="rating-stars">${stars}</span>
+      <b>${rating.toFixed(1)}</b>
+      <small>(${count} ratings)</small>
+    </div>
+  `;
+}
   // Load products from Supabase
   async function loadProductsFromSupabase() {
     try {
       const { data, error } = await supabaseClient
         .from("products")
         .select(
-          "id, name, category, price, original_price, image_url, description, stock, active"
+          "id, name, category, price, original_price, image_url, description, stock, active, rating, rating_count, rating_visible"
         )
         .order("id", { ascending: true });
 
@@ -563,6 +591,22 @@
         .detail-actions {
           flex-direction: column;
         }
+        .product-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 9px;
+  font-size: 13px;
+}
+.rating-stars {
+  color: #e5a000;
+  letter-spacing: 1px;
+}
+.product-rating b {
+  color: #222;
+}
+.product-rating small {
+  color: #777;
       }
     `;
 
@@ -596,8 +640,9 @@
         alt="${esc(p.title)}">
 
       <p class="product-category">${esc(p.category || "")}</p>
+      ${ratingMarkup(p)}
       <h2>${esc(p.title)}</h2>
-
+      ${ratingMarkup(p)}
       <div class="detail-price">
         <span class="price-now">${money(price)}</span>
         ${
@@ -1250,7 +1295,23 @@
                 Product tag
                 <input name="tag" value="${esc(product.tag || "")}">
               </label>
+              <label>
+                Rating (0 से 5)
+              <input name="rating" type="number" min="0" max="5" step="0.1"
+                value="${Number(product.rating) || 0}">
+              </label>
 
+               <label>
+                Rating Count
+               <input name="ratingCount" type="number" min="0" step="1"
+                value="${Number(product.ratingCount) || 0}">
+               </label>
+
+               <label>
+               <input name="ratingVisible" type="checkbox"
+               ${product.ratingVisible === true ? "checked" : ""}>
+                Website par rating dikhayein
+              </label>
               <label>
                 Product image URL
                 <input name="image" type="url"
@@ -1334,7 +1395,19 @@ async function saveEditedProduct(event, form) {
   const tag = String(data.get("tag") || "").trim();
   const imageText = String(data.get("image") || "").trim();
   const description = String(data.get("description") || "").trim();
+const rating = Number(data.get("rating") || 0);
+const ratingCount = Number(data.get("ratingCount") || 0);
+const ratingVisible = form.elements.ratingVisible.checked;
 
+if (!Number.isFinite(rating) || rating < 0 || rating > 5) {
+  toast("Rating 0 se 5 ke beech honi chahiye.");
+  return;
+}
+
+if (!Number.isInteger(ratingCount) || ratingCount < 0) {
+  toast("Rating Count valid number hona chahiye.");
+  return;
+} 
   const sizeType = String(data.get("sizeType") || "auto")
     .trim().toLowerCase();
 
@@ -1386,16 +1459,19 @@ async function saveEditedProduct(event, form) {
 
   try {
     const { error: updateError } = await supabaseClient
-      .from("products")
-      .update({
-        name: title,
-        category,
-        price,
-        original_price: oldPrice,
-        image_url: image,
-        description
-      })
-      .eq("id", id);
+  .from("products")
+  .update({
+    name: title,
+    category,
+    price,
+    original_price: oldPrice,
+    image_url: image,
+    description,
+    rating,
+    rating_count: ratingCount,
+    rating_visible: ratingVisible
+  })
+  .eq("id", id);
 
     if (updateError) throw updateError;
 
