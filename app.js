@@ -20,8 +20,7 @@
     SUPABASE_KEY
   );
   const PIN = "2468";
-  const placeholder =
-    "https://placehold.co/600x750/f7edf6/9f2089?text=Product";
+  
 
   const defaults = [
     [1, "Women's Printed Kurti", "Women", 199, 399, "BESTSELLER",
