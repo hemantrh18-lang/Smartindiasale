@@ -616,6 +616,65 @@
     message("Order status update ho gaya.");
   });
 
+  // FIX OLD ADD PRODUCT FORM
+  $("#addForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!(await verifyAdmin())) {
+      message("Admin permission required.", true);
+      return;
+    }
+
+    const form = event.currentTarget;
+    const button = form.querySelector('[type="submit"]');
+
+    if (button) button.disabled = true;
+
+    try {
+      const productData = {
+        name: form.elements.title.value.trim(),
+        category: form.elements.category.value.trim(),
+        price: Number(form.elements.price.value),
+        original_price: Number(form.elements.oldPrice.value || 0),
+        image_url: form.elements.image.value.trim(),
+        description: form.elements.description.value.trim(),
+        stock: 0,
+        rating: 0,
+        rating_count: 0,
+        rating_visible: true,
+        active: true
+      };
+
+      if (
+        !productData.name ||
+        !productData.category ||
+        !Number.isFinite(productData.price) ||
+        !Number.isFinite(productData.original_price) ||
+        productData.price < 0 ||
+        productData.original_price < 0
+      ) {
+        throw new Error("Product details sahi bharo.");
+      }
+
+      const { data, error } = await supabaseClient
+        .from("products")
+        .insert(productData)
+        .select("id");
+
+      if (error) throw error;
+      if (!data?.length) throw new Error("Product save confirm nahi hua.");
+
+      form.reset();
+      message("Product successfully add ho gaya.");
+      await loadProducts();
+
+    } catch (error) {
+      message("Product add nahi hua: " + error.message, true);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  });
+
   // START
   checkLogin().catch((error) => {
     console.error(error);
