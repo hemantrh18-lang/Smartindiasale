@@ -990,7 +990,6 @@ function ratingMarkup(product) {
   /* UPI PAYMENT AND DYNAMIC QR */
 
   function upiUri(amount, reference) {
-    console.log("UPI URI:", upiUri(10, "TEST123"));
   const upiId = String(payment.upiId || "").trim();
   const merchant = String(payment.merchantName || "Meesho Sale").trim();
   const total = Number(amount);
@@ -1012,9 +1011,12 @@ function ratingMarkup(product) {
     cu: "INR"
   });
 
-  return "upi://pay?" + params.toString();
-}
+  const uri = "upi://pay?" + params.toString();
 
+  console.log("UPI PAYMENT LINK:", uri);
+
+  return uri;
+}
   function renderPayment() {
     const host = $("#checkoutPayment");
     if (!host || !checkoutDraft) return;
