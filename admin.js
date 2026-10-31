@@ -2,8 +2,11 @@
 (() => {
   "use strict";
 
+  // SUPABASE CONNECTION
   const SUPABASE_URL = "https://vsljvkssdjmrucrhfcqj.supabase.co";
   const SUPABASE_KEY = "sb_publishable_SMz8kHd4AhpO_Iv8n3ndmQ_GBbGDDk_";
+
+  const ORDER_KEY = "msSaleOrdersV1";
 
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -13,27 +16,30 @@
     SUPABASE_KEY
   );
 
-  const ORDER_KEY = "msSaleOrdersV1";
-
   let products = [];
   let orders = [];
 
-  const message = (text, error = false) => {
-    const box = $("#adminMessage");
-    if (!box) return;
+  const placeholder =
+    "https://placehold.co/600x750/f7edf6/9f2089?text=Product";
 
-    box.textContent = text;
-    box.style.color = error ? "#c62828" : "#188038";
-  };
-
-  const escapeHTML = (value) =>
-    String(value ?? "").replace(/[&<>"']/g, (char) => ({
+  // HELPERS
+  function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
       "&": "&amp;",
       "<": "&lt;",
       ">": "&gt;",
       '"': "&quot;",
       "'": "&#39;"
     })[char]);
+  }
+
+  function message(text, error = false) {
+    const box = $("#adminMessage");
+    if (!box) return;
+
+    box.textContent = text;
+    box.style.color = error ? "#c62828" : "#188038";
+  }
 
   async function verifyAdmin() {
     const { data: { session }, error } =
@@ -59,10 +65,9 @@
     $("#logoutButton").hidden = false;
   }
 
+  // LOGIN
   async function checkLogin() {
-    const allowed = await verifyAdmin();
-
-    if (allowed) {
+    if (await verifyAdmin()) {
       showDashboard();
       await loadProducts();
       await loadPaymentSettings();
@@ -72,31 +77,26 @@
     }
   }
 
-  // LOGIN
   $("#adminLoginForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const button = $("#loginButton");
     const form = event.currentTarget;
-    const email = form.elements.email.value.trim();
-    const password = form.elements.password.value;
+    const button = $("#loginButton");
 
     button.disabled = true;
     message("Login ho raha hai...");
 
     try {
       const { error } = await supabaseClient.auth.signInWithPassword({
-        email,
-        password
+        email: form.elements.email.value.trim(),
+        password: form.elements.password.value
       });
 
       if (error) throw error;
 
-      const allowed = await verifyAdmin();
-
-      if (!allowed) {
+      if (!(await verifyAdmin())) {
         await supabaseClient.auth.signOut();
-        throw new Error("Is account ko Admin permission nahi mili hai.");
+        throw new Error("Is account ko Admin permission nahi hai.");
       }
 
       showDashboard();
@@ -107,7 +107,7 @@
       loadOrders();
 
     } catch (error) {
-      message(error.message || "Login failed.", true);
+      message(error.message, true);
     } finally {
       button.disabled = false;
     }
@@ -135,7 +135,134 @@
     });
   });
 
-  // PRODUCTS
+  // PRODUCT FORM
+  function productFormHTML(product = {}) {
+    const editing = product.id !== undefined && product.id !== null;
+
+    return `
+      <form class="admin-product-editor"
+        data-product-form="${editing ? "edit" : "add"}"
+        ${editing ? `data-product-id="${escapeHTML(product.id)}"` : ""}
+        style="border:1px solid #ddd;padding:14px;border-radius:12px;margin:12px 0">
+
+        <h3>${editing ? "Edit Product Details" : "Add New Product"}</h3>
+
+        <label>Product Name</label>
+        <input name="name" required
+          value="${escapeHTML(product.name || "")}"
+          placeholder="Product name">
+
+        <label>Category</label>
+        <input name="category" required
+          value="${escapeHTML(product.category || "")}"
+          placeholder="Women, Beauty, Men, Home">
+
+        <label>Selling Price (₹)</label>
+        <input name="price" type="number" min="0" step="0.01" required
+          value="${escapeHTML(product.price ?? "")}">
+
+        <label>Original Price (₹)</label>
+        <input name="original_price" type="number" min="0" step="0.01"
+          value="${escapeHTML(product.original_price ?? "")}">
+
+        <label>Product Image URL</label>
+        <input name="image_url" type="url"
+          value="${escapeHTML(product.image_url || "")}"
+          placeholder="https://example.com/image.jpg">
+
+        <label>Product Description</label>
+        <textarea name="description" rows="3"
+          placeholder="Product details...">${escapeHTML(product.description || "")}</textarea>
+
+        <label>Stock Quantity</label>
+        <input name="stock" type="number" min="0"
+          value="${escapeHTML(product.stock ?? 0)}">
+
+        <label>Product Rating (0 to 5)</label>
+        <input name="rating" type="number" min="0" max="5" step="0.1"
+          value="${escapeHTML(product.rating ?? 0)}">
+
+        <label>Rating Count</label>
+        <input name="rating_count" type="number" min="0" step="1"
+          value="${escapeHTML(product.rating_count ?? 0)}">
+
+        <label style="display:flex;gap:8px;align-items:center;margin:12px 0">
+          <input name="rating_visible" type="checkbox"
+            ${product.rating_visible !== false ? "checked" : ""}>
+          Show Rating on Website
+        </label>
+
+        <label style="display:flex;gap:8px;align-items:center;margin:12px 0">
+          <input name="active" type="checkbox"
+            ${product.active !== false ? "checked" : ""}>
+          Product Active / Visible on Website
+        </label>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button type="submit">
+            ${editing ? "Save All Changes" : "Add Product"}
+          </button>
+
+          ${editing ? `
+            <button type="button" data-close-editor>
+              Cancel
+            </button>
+          ` : ""}
+        </div>
+      </form>
+    `;
+  }
+
+  function readProductForm(form) {
+    const rating = Number(form.elements.rating.value || 0);
+    const price = Number(form.elements.price.value);
+    const originalPrice = Number(
+      form.elements.original_price.value || 0
+    );
+    const stock = Number(form.elements.stock.value || 0);
+    const ratingCount = Number(
+      form.elements.rating_count.value || 0
+    );
+
+    if (
+      !Number.isFinite(price) ||
+      !Number.isFinite(originalPrice) ||
+      !Number.isFinite(stock) ||
+      !Number.isFinite(rating) ||
+      !Number.isFinite(ratingCount)
+    ) {
+      throw new Error("Please enter valid numbers.");
+    }
+
+    if (price < 0 || originalPrice < 0 ||
+        stock < 0 || ratingCount < 0 ||
+        rating < 0 || rating > 5) {
+      throw new Error("Price, stock or rating value is invalid.");
+    }
+
+    const name = form.elements.name.value.trim();
+    const category = form.elements.category.value.trim();
+
+    if (!name || !category) {
+      throw new Error("Product name aur category zaroor bharo.");
+    }
+
+    return {
+      name,
+      category,
+      price,
+      original_price: originalPrice,
+      image_url: form.elements.image_url.value.trim(),
+      description: form.elements.description.value.trim(),
+      stock: Math.floor(stock),
+      rating,
+      rating_count: Math.floor(ratingCount),
+      rating_visible: form.elements.rating_visible.checked,
+      active: form.elements.active.checked
+    };
+  }
+
+  // LOAD PRODUCTS
   async function loadProducts() {
     const { data, error } = await supabaseClient
       .from("products")
@@ -151,163 +278,102 @@
     renderProducts();
   }
 
+  // RENDER PRODUCTS
   function renderProducts() {
     const container = $("#adminProducts");
     if (!container) return;
 
-    $("#adminCount").textContent = products.length;
-
-    if (!products.length) {
-      container.innerHTML = "<p>Abhi koi product nahi hai.</p>";
-      return;
+    if ($("#adminCount")) {
+      $("#adminCount").textContent = products.length;
     }
 
-    container.innerHTML = products.map((product) => `
-      <div class="admin-product-card"
-           style="border:1px solid #ddd;padding:12px;margin:12px 0;border-radius:10px">
-
-        <div style="display:flex;gap:12px;align-items:center">
-          <img
-            src="${escapeHTML(product.image_url || "")}"
-            alt=""
-            style="width:75px;height:90px;object-fit:cover;border-radius:7px"
-            onerror="this.style.display='none'">
-
-          <div style="flex:1;min-width:0">
-            <strong>${escapeHTML(product.name)}</strong>
-            <p>${escapeHTML(product.category)}</p>
-            <b>₹${escapeHTML(product.price)}</b>
-            <small> | पुरानी कीमत: ₹${escapeHTML(product.original_price)}</small>
-            <p>Rating: ${escapeHTML(product.rating ?? 0)}</p>
-            <p>Status: ${product.active ? "Active" : "Inactive"}</p>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-          <button type="button" data-edit="${escapeHTML(product.id)}">
-            Edit
-          </button>
-          <button type="button" data-delete="${escapeHTML(product.id)}">
-            Delete
-          </button>
-        </div>
+    container.innerHTML = `
+      <div style="margin-bottom:15px">
+        <button type="button" id="showAddProduct">
+          + Add New Product
+        </button>
       </div>
-    `).join("");
+
+      <div id="newProductEditor"></div>
+
+      ${products.length ? products.map((product) => `
+        <div style="border:1px solid #ddd;padding:12px;margin:12px 0;border-radius:12px">
+
+          <div style="display:flex;gap:12px;align-items:center">
+            <img
+              src="${escapeHTML(product.image_url || placeholder)}"
+              alt=""
+              style="width:85px;height:100px;object-fit:cover;border-radius:8px"
+              onerror="this.src='${placeholder}'">
+
+            <div style="flex:1;min-width:0">
+              <strong>${escapeHTML(product.name)}</strong>
+              <p>${escapeHTML(product.category)}</p>
+              <p>Price: ₹${escapeHTML(product.price)}</p>
+              <p>Stock: ${escapeHTML(product.stock ?? 0)}</p>
+              <p>Rating: ${escapeHTML(product.rating ?? 0)} / 5
+                (${escapeHTML(product.rating_count ?? 0)} ratings)
+              </p>
+              <p>${product.active ? "Active" : "Inactive"}</p>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button type="button" data-edit="${escapeHTML(product.id)}">
+              Edit Full Details
+            </button>
+
+            <button type="button" data-delete="${escapeHTML(product.id)}">
+              Delete
+            </button>
+          </div>
+
+          <div data-editor="${escapeHTML(product.id)}"></div>
+        </div>
+      `).join("") : "<p>Abhi koi product nahi hai.</p>"}
+    `;
   }
 
-  // ADD PRODUCT
-  $("#addForm")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  // ADD / EDIT / DELETE PRODUCT EVENTS
+  $("#adminProducts")?.addEventListener("click", async (event) => {
+    const addButton = event.target.closest("#showAddProduct");
+    const editButton = event.target.closest("[data-edit]");
+    const deleteButton = event.target.closest("[data-delete]");
+    const closeButton = event.target.closest("[data-close-editor]");
 
-    if (!(await verifyAdmin())) {
-      message("Admin login required.", true);
+    if (addButton) {
+      const holder = $("#newProductEditor");
+      holder.innerHTML = productFormHTML();
+
+      holder.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
 
-    const form = event.currentTarget;
-    const button = form.querySelector('[type="submit"]');
-    button.disabled = true;
-
-    const newProduct = {
-      name: form.elements.title.value.trim(),
-      category: form.elements.category.value.trim(),
-      price: Number(form.elements.price.value),
-      original_price: Number(form.elements.oldPrice.value || 0),
-      image_url: form.elements.image.value.trim(),
-      description: form.elements.description.value.trim(),
-      stock: 0,
-      active: true
-    };
-
-    try {
-      const { error } = await supabaseClient
-        .from("products")
-        .insert(newProduct);
-
-      if (error) throw error;
-
-      form.reset();
-      message("Product successfully add ho gaya.");
-      await loadProducts();
-
-    } catch (error) {
-      message("Product add nahi hua: " + error.message, true);
-    } finally {
-      button.disabled = false;
+    if (closeButton) {
+      closeButton.closest("form")?.remove();
+      return;
     }
-  });
-
-  // EDIT PRODUCT
-  $("#adminProducts")?.addEventListener("click", async (event) => {
-    const editButton = event.target.closest("[data-edit]");
-    const deleteButton = event.target.closest("[data-delete]");
 
     if (editButton) {
+      const id = editButton.dataset.edit;
       const product = products.find(
-        (item) => String(item.id) === editButton.dataset.edit
+        (item) => String(item.id) === String(id)
       );
 
       if (!product) return;
 
-      const name = prompt("Product name:", product.name);
-      if (name === null) return;
+      const holder = $(`[data-editor="${CSS.escape(String(id))}"]`);
+      if (!holder) return;
 
-      const category = prompt("Category:", product.category || "");
-      if (category === null) return;
-
-      const price = prompt("Selling price:", product.price);
-      if (price === null) return;
-
-      const oldPrice = prompt("Original price:", product.original_price || 0);
-      if (oldPrice === null) return;
-
-      const image = prompt("Image URL:", product.image_url || "");
-      if (image === null) return;
-
-      const description = prompt(
-        "Description:",
-        product.description || ""
-      );
-      if (description === null) return;
-
-      const newPrice = Number(price);
-      const newOldPrice = Number(oldPrice);
-
-      if (!name.trim() || !Number.isFinite(newPrice) ||
-          !Number.isFinite(newOldPrice) || newPrice < 0 || newOldPrice < 0) {
-        message("Product details sahi bharo.", true);
-        return;
-      }
-
-      if (!(await verifyAdmin())) {
-        message("Admin permission required.", true);
-        return;
-      }
-
-      const { error } = await supabaseClient
-        .from("products")
-        .update({
-          name: name.trim(),
-          category: category.trim(),
-          price: newPrice,
-          original_price: newOldPrice,
-          image_url: image.trim(),
-          description: description.trim()
-        })
-        .eq("id", product.id);
-
-      if (error) {
-        message("Update failed: " + error.message, true);
-        return;
-      }
-
-      message("Product update ho gaya.");
-      await loadProducts();
+      holder.innerHTML = productFormHTML(product);
+      holder.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
 
     if (deleteButton) {
+      const id = deleteButton.dataset.delete;
       const product = products.find(
-        (item) => String(item.id) === deleteButton.dataset.delete
+        (item) => String(item.id) === String(id)
       );
 
       if (!product) return;
@@ -331,12 +397,67 @@
       }
 
       if (!data?.length) {
-        message("Product delete nahi hua. Database permission check karo.", true);
+        message("Delete nahi hua. Supabase RLS permission check karo.", true);
         return;
       }
 
       message("Product delete ho gaya.");
       await loadProducts();
+    }
+  });
+
+  // SAVE ADD / EDIT FORM
+  $("#adminProducts")?.addEventListener("submit", async (event) => {
+    const form = event.target.closest("[data-product-form]");
+    if (!form) return;
+
+    event.preventDefault();
+
+    if (!(await verifyAdmin())) {
+      message("Admin permission required.", true);
+      return;
+    }
+
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+
+    try {
+      const productData = readProductForm(form);
+
+      let result;
+
+      if (form.dataset.productForm === "edit") {
+        const id = form.dataset.productId;
+
+        result = await supabaseClient
+          .from("products")
+          .update(productData)
+          .eq("id", id)
+          .select("id");
+      } else {
+        result = await supabaseClient
+          .from("products")
+          .insert(productData)
+          .select("id");
+      }
+
+      if (result.error) throw result.error;
+
+      if (!result.data?.length) {
+        throw new Error("Database ne change confirm nahi kiya. RLS check karo.");
+      }
+
+      message(
+        form.dataset.productForm === "edit"
+          ? "Product ki saari details update ho gayi."
+          : "Naya product add ho gaya."
+      );
+
+      await loadProducts();
+
+    } catch (error) {
+      message(error.message || "Product save nahi hua.", true);
+      button.disabled = false;
     }
   });
 
@@ -349,7 +470,7 @@
       .maybeSingle();
 
     if (error) {
-      message("Payment settings load nahi hui: " + error.message, true);
+      message("Payment settings error: " + error.message, true);
       return;
     }
 
@@ -372,19 +493,19 @@
     }
 
     const form = event.currentTarget;
-
-    const settings = {
-      id: true,
-      merchant_name: form.elements.merchantName.value.trim(),
-      upi_id: form.elements.upiId.value.trim(),
-      qr_image_url: form.elements.qrImage.value.trim(),
-      updated_at: new Date().toISOString()
-    };
-
     const button = form.querySelector('[type="submit"]');
+
     if (button) button.disabled = true;
 
     try {
+      const settings = {
+        id: true,
+        merchant_name: form.elements.merchantName.value.trim(),
+        upi_id: form.elements.upiId.value.trim(),
+        qr_image_url: form.elements.qrImage.value.trim(),
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await supabaseClient
         .from("payment_settings")
         .upsert(settings, { onConflict: "id" });
@@ -394,13 +515,13 @@
       message("Payment settings save ho gayi.");
 
     } catch (error) {
-      message("Settings save nahi hui: " + error.message, true);
+      message(error.message, true);
     } finally {
       if (button) button.disabled = false;
     }
   });
 
-  // ORDERS - TEMPORARILY FROM THIS BROWSER'S LOCAL STORAGE
+  // ORDERS - CURRENTLY LOCAL STORAGE ONLY
   function loadOrders() {
     try {
       orders = JSON.parse(localStorage.getItem(ORDER_KEY) || "[]");
@@ -419,37 +540,29 @@
     if (!orders.length) {
       container.innerHTML = `
         <p>Abhi koi local order nahi mila.</p>
-        <p>Note: Orders abhi Supabase mein sync nahi ho rahe hain.</p>
+        <p>Orders ko sabhi devices par dekhne ke liye Supabase integration abhi baaki hai.</p>
       `;
       return;
     }
 
     container.innerHTML = orders.map((order, index) => {
-      const customer = order.customer_name || order.name || "Customer";
-      const phone = order.phone || "";
-      const address = order.address || "";
-      const total = order.total ?? order.amount ?? 0;
-      const status = order.order_status || order.status || "placed";
-      const payment = order.payment_status || "pending";
-
       const items = Array.isArray(order.items)
-        ? order.items.map((item) => {
-            const itemName = item.name || item.title || "Product";
-            const qty = item.qty || item.quantity || 1;
-            return `${escapeHTML(itemName)} × ${escapeHTML(qty)}`;
-          }).join("<br>")
+        ? order.items.map((item) => `
+          ${escapeHTML(item.name || item.title || "Product")}
+          × ${escapeHTML(item.qty || item.quantity || 1)}
+        `).join("<br>")
         : "Order items";
 
       return `
         <div style="border:1px solid #ddd;padding:12px;margin:12px 0;border-radius:10px">
           <strong>Order #${index + 1}</strong>
-          <p>Customer: ${escapeHTML(customer)}</p>
-          <p>Phone: ${escapeHTML(phone)}</p>
-          <p>Address: ${escapeHTML(address)}</p>
+          <p>Customer: ${escapeHTML(order.customer_name || order.name || "")}</p>
+          <p>Phone: ${escapeHTML(order.phone || "")}</p>
+          <p>Address: ${escapeHTML(order.address || "")}</p>
           <p>Items:<br>${items}</p>
-          <p>Total: ₹${escapeHTML(total)}</p>
-          <p>Payment: ${escapeHTML(payment)}</p>
-          <p>Order status: ${escapeHTML(status)}</p>
+          <p>Total: ₹${escapeHTML(order.total ?? order.amount ?? 0)}</p>
+          <p>Payment: ${escapeHTML(order.payment_status || "pending")}</p>
+          <p>Order: ${escapeHTML(order.order_status || order.status || "placed")}</p>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button type="button" data-paid="${index}">Mark Paid</button>
@@ -474,8 +587,11 @@
       return;
     }
 
-    const index = Number(button.dataset.paid ??
-      button.dataset.pending ?? button.dataset.cancel);
+    const index = Number(
+      button.dataset.paid ??
+      button.dataset.pending ??
+      button.dataset.cancel
+    );
 
     if (!Number.isInteger(index) || !orders[index]) return;
 
@@ -491,7 +607,7 @@
     }
 
     if (cancel) {
-      if (!confirm("Is order ko cancel karna hai?")) return;
+      if (!confirm("Order cancel karna hai?")) return;
       orders[index].order_status = "cancelled";
     }
 
@@ -504,7 +620,7 @@
   checkLogin().catch((error) => {
     console.error(error);
     showLogin();
-    message("Admin panel load nahi hua: " + error.message, true);
+    message("Admin panel error: " + error.message, true);
   });
 
 })();
