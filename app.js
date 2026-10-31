@@ -1020,7 +1020,7 @@ function ratingMarkup(product) {
 
     const amount = checkoutDraft.total;
     const uri = upiUri(amount, checkoutDraft.reference);
-    
+     console.log("UPI PAYMENT LINK:", uri);
 
     host.innerHTML = `
       <h3>Pay ${money(amount)} via UPI</h3>
