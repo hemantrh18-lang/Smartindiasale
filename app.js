@@ -1176,27 +1176,24 @@ function ratingMarkup(product) {
       toast("Order Supabase mein save ho raha hai...");
 
       // SAVE ORDER TO SUPABASE
-      const { data, error } = await supabaseClient
-        .from("orders")
-        .insert({
-          customer_name: order.name,
-          phone: order.phone,
-          address: order.address,
-          items: order.items,
-          total: order.total,
-          payment_method: "UPI",
-          payment_status: "pending",
-          order_status: "placed",
-          payment_reference: order.paymentReference
-        })
-        .select("id")
-        .single();
+      const { error } = await supabaseClient
+  .from("orders")
+  .insert({
+    customer_name: order.name,
+    phone: order.phone,
+    address: order.address,
+    items: order.items,
+    total: order.total,
+    payment_method: "UPI",
+    payment_status: "pending",
+    order_status: "placed",
+    payment_reference: order.paymentReference
+  });
 
-      if (error) throw error;
+if (error) throw error;
 
-      // DATABASE ORDER ID
-      order.id = data.id;
-      order.databaseId = data.id;
+// Customer-facing order reference
+order.databaseId = null;
       order.payment_status = "pending";
       order.order_status = "placed";
 
