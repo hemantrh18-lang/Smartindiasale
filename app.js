@@ -135,6 +135,41 @@
     qrImage: ""
   });
 
+async function loadPaymentSettingsFromSupabase() {
+  try {
+    const { data, error } = await supabaseClient
+      .from("payment_settings")
+      .select("merchant_name, upi_id, qr_image_url")
+      .eq("id", true)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      payment = {
+        merchantName: data.merchant_name || "Paytm Merchant",
+        upiId: data.upi_id || "",
+        qrImage: validUrl(data.qr_image_url) || ""
+      };
+
+      // Local cache only; Supabase is the main source.
+      write(K.pay, payment);
+
+      const form = $("#paymentForm");
+      if (form) {
+        form.elements.merchantName.value = payment.merchantName;
+        form.elements.upiId.value = payment.upiId;
+        form.elements.qrImage.value = payment.qrImage;
+      }
+
+      console.log("Payment settings loaded from Supabase");
+    }
+  } catch (error) {
+    console.error("Payment settings load failed:", error);
+    toast("Payment settings database se load nahi hui.");
+  }
+}
+
   // Convert Supabase database columns into the website format
   function mapDatabaseProduct(row) {
   return {
@@ -2159,36 +2194,84 @@ $("#adminForm")?.addEventListener("submit", async event => {
 
   /* UPI AND QR SETTINGS */
 
-  $("#paymentForm")?.addEventListener("submit", event => {
-    event.preventDefault();
+  
+$("#paymentForm")?.addEventListener("submit", async event => {
+  event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
-    const upiId = String(formData.get("upiId") || "").trim();
-    const merchantName = String(formData.get("merchantName") || "").trim();
-    const qrImageText = String(formData.get("qrImage") || "").trim();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
 
-    const qrImage = qrImageText ? validUrl(qrImageText) : "";
+  const upiId = String(formData.get("upiId") || "").trim();
+  const merchantName = String(
+    formData.get("merchantName") || ""
+  ).trim();
 
-    if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
-      toast("Valid UPI ID enter karein, e.g. name@bank");
-      return;
-    }
+  const qrImageText = String(
+    formData.get("qrImage") || ""
+  ).trim();
 
-    if (qrImageText && !qrImage) {
-      toast("QR image ke liye valid http/https URL enter karein.");
-      return;
-    }
+  const qrImage = qrImageText ? validUrl(qrImageText) : "";
 
-    payment = {
-      merchantName: merchantName || "Meesho Sale",
-      upiId,
-      qrImage
+  if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
+    toast("Valid UPI ID enter karein.");
+    return;
+  }
+
+  if (qrImageText && !qrImage) {
+    toast("Valid QR image URL enter karein.");
+    return;
+  }
+
+  const { data: sessionData, error: sessionError } =
+    await supabaseClient.auth.getSession();
+
+  if (sessionError || !sessionData.session) {
+    toast("Admin login dobara karein.");
+    return;
+  }
+
+  const { data: isAdmin, error: roleError } =
+    await supabaseClient.rpc("is_admin");
+
+  if (roleError || isAdmin !== true) {
+    toast("Admin permission verify nahi hui.");
+    return;
+  }
+
+  const button = form.querySelector('button[type="submit"]');
+  if (button) button.disabled = true;
+
+  try {
+    const newPayment = {
+      id: true,
+      merchant_name: merchantName || "Paytm Merchant",
+      upi_id: upiId,
+      qr_image_url: qrImage || null,
+      updated_at: new Date().toISOString()
     };
 
-    if (write(K.pay, payment)) {
-      toast("Payment settings saved");
-    }
-  });
+    const { error } = await supabaseClient
+      .from("payment_settings")
+      .upsert(newPayment, { onConflict: "id" });
+
+    if (error) throw error;
+
+    payment = {
+      merchantName: newPayment.merchant_name,
+      upiId: newPayment.upi_id,
+      qrImage: qrImage
+    };
+
+    write(K.pay, payment);
+
+    toast("Payment settings Supabase mein save ho gayi!");
+  } catch (error) {
+    console.error("Payment settings save failed:", error);
+    toast("Save nahi hua: " + error.message);
+  } finally {
+    if (button) button.disabled = false;
+  }
+});
 
   /* INITIAL LOAD */
 
@@ -2200,5 +2283,6 @@ $("#adminForm")?.addEventListener("submit", async event => {
 saveC();
 renderCart(false);
 
-loadProductsFromSupabase();
+loadProductsFromSupabase(); 
+loadPaymentSettingsFromSupabase();
 })();
