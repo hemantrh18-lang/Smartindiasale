@@ -990,20 +990,29 @@ function ratingMarkup(product) {
   /* UPI PAYMENT AND DYNAMIC QR */
 
   function upiUri(amount, reference) {
-    const upiId = String(payment.upiId || "").trim();
+  const upiId = String(payment.upiId || "").trim();
+  const merchant = String(payment.merchantName || "Meesho Sale").trim();
+  const total = Number(amount);
 
-    if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
-      return "";
-    }
-
-    return "upi://pay?" + new URLSearchParams({
-      pa: upiId,
-      pn: payment.merchantName || "Meesho Sale",
-      am: Number(amount).toFixed(2),
-      cu: "INR",
-      tn: "Meesho Sale " + reference
-    }).toString();
+  if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
+    return "";
   }
+
+  if (!Number.isFinite(total) || total <= 0) {
+    return "";
+  }
+
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: merchant,
+    tr: String(reference || ""),
+    tn: "Meesho Sale Order " + String(reference || ""),
+    am: total.toFixed(2),
+    cu: "INR"
+  });
+
+  return "upi://pay?" + params.toString();
+}
 
   function renderPayment() {
     const host = $("#checkoutPayment");
