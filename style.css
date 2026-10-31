@@ -1055,3 +1055,30 @@ a:focus-visible {
     font-size: 10px;
   }
 }
+/* MOBILE HEADER FIX */
+
+@media (max-width: 600px) {
+  header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand {
+    font-size: 18px;
+  }
+
+  .search {
+    grid-column: 1 / -1;
+    order: unset;
+    width: 100%;
+  }
+
+  #historyOpen,
+  #cartOpen {
+    white-space: nowrap;
+    padding: 8px 7px;
+    font-size: 11px;
+  }
+}
