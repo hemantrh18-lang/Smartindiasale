@@ -1138,7 +1138,8 @@ function ratingMarkup(product) {
 
   /* ORDER CREATION: PENDING UNTIL ADMIN VERIFIES */
 
-  function submitOrderForVerification() {
+
+  async function submitOrderForVerification() {
     if (!checkoutDraft || !cart.length) {
       toast("Checkout dobara start karein");
       setCheckoutStep("address");
@@ -1153,14 +1154,17 @@ function ratingMarkup(product) {
       phone: address.phone,
       address: formatAddress(address),
       addressDetails: { ...address },
+
       items: checkoutDraft.items.map(item => ({
         id: item.id,
         title: item.title,
+        name: item.title,
         price: Number(item.price),
         qty: Number(item.qty),
         size: item.size || ""
       })),
-      total: checkoutDraft.total,
+
+      total: Number(checkoutDraft.total),
       paymentMethod: "UPI",
       paymentReference: checkoutDraft.reference,
       paymentStatus: "Pending verification",
@@ -1168,43 +1172,97 @@ function ratingMarkup(product) {
       createdAt: new Date().toISOString()
     };
 
-    const previousOrders = orders;
-    orders = [order, ...orders];
+    try {
+      toast("Order Supabase mein save ho raha hai...");
 
-    if (!write(K.o, orders)) {
-      orders = previousOrders;
-      toast("Order save nahi hua. Browser storage check karein.");
-      return;
+      // SAVE ORDER TO SUPABASE
+      const { data, error } = await supabaseClient
+        .from("orders")
+        .insert({
+          customer_name: order.name,
+          phone: order.phone,
+          address: order.address,
+          items: order.items,
+          total: order.total,
+          payment_method: "UPI",
+          payment_status: "pending",
+          order_status: "placed",
+          payment_reference: order.paymentReference
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      // DATABASE ORDER ID
+      order.id = data.id;
+      order.databaseId = data.id;
+      order.payment_status = "pending";
+      order.order_status = "placed";
+
+      // LOCAL BACKUP
+      const previousOrders = orders;
+      orders = [order, ...orders];
+
+      if (!write(K.o, orders)) {
+        orders = previousOrders;
+        console.warn("Order saved in Supabase, but local backup failed.");
+      }
+
+      // CLEAR CART ONLY AFTER DATABASE SAVE
+      cart = [];
+      saveC();
+      renderCart(false);
+
+      if (typeof renderAdminOrders === "function") {
+        renderAdminOrders();
+      }
+
+      const orderId = $("#confirmationOrderId");
+      const paymentStatus = $("#confirmationPaymentStatus");
+      const orderStatus = $("#confirmationOrderStatus");
+      const confirmationTotal = $("#confirmationTotal");
+      const confirmationTitle = $("#confirmationTitle");
+      const confirmationMessage = $("#confirmationMessage");
+
+      if (orderId) orderId.textContent = order.id;
+
+      if (paymentStatus) {
+        paymentStatus.textContent = "Pending verification";
+      }
+
+      if (orderStatus) {
+        orderStatus.textContent = "Awaiting payment verification";
+      }
+
+      if (confirmationTotal) {
+        confirmationTotal.textContent = money(order.total);
+      }
+
+      if (confirmationTitle) {
+        confirmationTitle.textContent = "Order submitted";
+      }
+
+      if (confirmationMessage) {
+        confirmationMessage.textContent =
+          "Thank you for shopping with Meesho Sale! " +
+          "Your order details have been received successfully. " +
+          "Our team will verify your payment and confirm your order shortly.";
+      }
+
+      setCheckoutStep("confirmation");
+      toast("Order successfully saved!");
+
+    } catch (error) {
+      console.error("SUPABASE ORDER ERROR:", error);
+
+      toast(
+        "Order save nahi hua: " +
+        (error.message || "Please try again.")
+      );
     }
-
-    cart = [];
-    saveC();
-    renderCart(false);
-    renderAdminOrders();
-
-    const orderId = $("#confirmationOrderId");
-    const paymentStatus = $("#confirmationPaymentStatus");
-    const orderStatus = $("#confirmationOrderStatus");
-    const confirmationTotal = $("#confirmationTotal");
-    const confirmationTitle = $("#confirmationTitle");
-    const confirmationMessage = $("#confirmationMessage");
-
-    if (orderId) orderId.textContent = order.id;
-    if (paymentStatus) paymentStatus.textContent = "Pending verification";
-    if (orderStatus) orderStatus.textContent = "Awaiting payment verification";
-    if (confirmationTotal) confirmationTotal.textContent = money(order.total);
-    if (confirmationTitle) confirmationTitle.textContent = "Order submitted";
-
-   if (confirmationMessage) {
-  confirmationMessage.textContent =
-    "Thank you for shopping with Meesho Sale! " +
-    "Your order details have been received successfully. " +
-    "Our team will verify your payment and confirm your order shortly. " +
-    "Don't worry, you will be notified once verification is complete.";
-}
-    setCheckoutStep("confirmation");
-    toast("Order submitted for verification");
   }
+
 
   function closeConfirmation() {
     hide("checkoutOverlay");
