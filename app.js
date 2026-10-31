@@ -1180,12 +1180,13 @@ function ratingMarkup(product) {
     if (confirmationTotal) confirmationTotal.textContent = money(order.total);
     if (confirmationTitle) confirmationTitle.textContent = "Order submitted";
 
-    if (confirmationMessage) {
-      confirmationMessage.textContent =
-        "Your order has been saved. It is NOT confirmed yet. " +
-        "The admin must verify payment against actual merchant records.";
-    }
-
+   if (confirmationMessage) {
+  confirmationMessage.textContent =
+    "Thank you for shopping with Meesho Sale! " +
+    "Your order details have been received successfully. " +
+    "Our team will verify your payment and confirm your order shortly. " +
+    "Don't worry, you will be notified once verification is complete.";
+}
     setCheckoutStep("confirmation");
     toast("Order submitted for verification");
   }
