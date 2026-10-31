@@ -521,15 +521,29 @@
     }
   });
 
-  // ORDERS - CURRENTLY LOCAL STORAGE ONLY
-  function loadOrders() {
-    try {
-      orders = JSON.parse(localStorage.getItem(ORDER_KEY) || "[]");
-      if (!Array.isArray(orders)) orders = [];
-    } catch {
-      orders = [];
+  
+  // ORDERS - SUPABASE INTEGRATION
+
+  async function loadOrders() {
+    const container = $("#adminOrders");
+    if (container) {
+      container.innerHTML = "<p>Orders load ho rahe hain...</p>";
     }
 
+    const { data, error } = await supabaseClient
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      orders = [];
+      renderOrders();
+      message("Orders load nahi hue: " + error.message, true);
+      console.error("ORDERS LOAD ERROR:", error);
+      return;
+    }
+
+    orders = data || [];
     renderOrders();
   }
 
@@ -539,47 +553,102 @@
 
     if (!orders.length) {
       container.innerHTML = `
-        <p>Abhi koi local order nahi mila.</p>
-        <p>Orders ko sabhi devices par dekhne ke liye Supabase integration abhi baaki hai.</p>
+        <p>Abhi koi order nahi mila.</p>
+        <button type="button" id="refreshOrders">Refresh Orders</button>
       `;
       return;
     }
 
-    container.innerHTML = orders.map((order, index) => {
-      const items = Array.isArray(order.items)
-        ? order.items.map((item) => `
-          ${escapeHTML(item.name || item.title || "Product")}
-          × ${escapeHTML(item.qty || item.quantity || 1)}
-        `).join("<br>")
-        : "Order items";
+    container.innerHTML = `
+      <button type="button" id="refreshOrders">
+        Refresh Orders
+      </button>
 
-      return `
-        <div style="border:1px solid #ddd;padding:12px;margin:12px 0;border-radius:10px">
-          <strong>Order #${index + 1}</strong>
-          <p>Customer: ${escapeHTML(order.customer_name || order.name || "")}</p>
-          <p>Phone: ${escapeHTML(order.phone || "")}</p>
-          <p>Address: ${escapeHTML(order.address || "")}</p>
-          <p>Items:<br>${items}</p>
-          <p>Total: ₹${escapeHTML(order.total ?? order.amount ?? 0)}</p>
-          <p>Payment: ${escapeHTML(order.payment_status || "pending")}</p>
-          <p>Order: ${escapeHTML(order.order_status || order.status || "placed")}</p>
+      ${orders.map((order) => {
+        const items = Array.isArray(order.items)
+          ? order.items.map((item) => `
+              ${escapeHTML(item.name || item.title || "Product")}
+              × ${escapeHTML(item.qty || item.quantity || 1)}
+              ${item.size ? `(Size: ${escapeHTML(item.size)})` : ""}
+            `).join("<br>")
+          : "Order items unavailable";
 
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button type="button" data-paid="${index}">Mark Paid</button>
-            <button type="button" data-pending="${index}">Mark Pending</button>
-            <button type="button" data-cancel="${index}">Cancel Order</button>
+        const date = order.created_at
+          ? new Date(order.created_at).toLocaleString("en-IN")
+          : "Not available";
+
+        return `
+          <div style="border:1px solid #ddd;padding:14px;margin:12px 0;border-radius:12px">
+
+            <strong>Order ID: ${escapeHTML(order.id)}</strong>
+
+            <p>Customer: ${escapeHTML(order.customer_name || "")}</p>
+            <p>Phone: ${escapeHTML(order.phone || "")}</p>
+            <p>Address: ${escapeHTML(order.address || "")}</p>
+
+            <p>Items:<br>${items}</p>
+
+            <p>Total: ₹${escapeHTML(order.total ?? 0)}</p>
+            <p>Payment Method: ${escapeHTML(order.payment_method || "UPI")}</p>
+            <p>Payment Reference: ${escapeHTML(order.payment_reference || "Not available")}</p>
+            <p>Payment Status: <strong>${escapeHTML(order.payment_status || "pending")}</strong></p>
+            <p>Order Status: <strong>${escapeHTML(order.order_status || "placed")}</strong></p>
+            <p>Order Date: ${escapeHTML(date)}</p>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+
+              <button type="button"
+                data-order-action="paid"
+                data-order-id="${escapeHTML(order.id)}">
+                Mark Paid
+              </button>
+
+              <button type="button"
+                data-order-action="pending"
+                data-order-id="${escapeHTML(order.id)}">
+                Mark Pending
+              </button>
+
+              <button type="button"
+                data-order-action="processing"
+                data-order-id="${escapeHTML(order.id)}">
+                Processing
+              </button>
+
+              <button type="button"
+                data-order-action="shipped"
+                data-order-id="${escapeHTML(order.id)}">
+                Shipped
+              </button>
+
+              <button type="button"
+                data-order-action="delivered"
+                data-order-id="${escapeHTML(order.id)}">
+                Delivered
+              </button>
+
+              <button type="button"
+                data-order-action="cancelled"
+                data-order-id="${escapeHTML(order.id)}">
+                Cancel Order
+              </button>
+
+            </div>
           </div>
-        </div>
-      `;
-    }).join("");
+        `;
+      }).join("")}
+    `;
   }
 
   $("#adminOrders")?.addEventListener("click", async (event) => {
-    const paid = event.target.closest("[data-paid]");
-    const pending = event.target.closest("[data-pending]");
-    const cancel = event.target.closest("[data-cancel]");
+    const refresh = event.target.closest("#refreshOrders");
 
-    const button = paid || pending || cancel;
+    if (refresh) {
+      await loadOrders();
+      return;
+    }
+
+    const button = event.target.closest("[data-order-action]");
     if (!button) return;
 
     if (!(await verifyAdmin())) {
@@ -587,33 +656,75 @@
       return;
     }
 
-    const index = Number(
-      button.dataset.paid ??
-      button.dataset.pending ??
-      button.dataset.cancel
+    const orderId = button.dataset.orderId;
+    const action = button.dataset.orderAction;
+
+    const order = orders.find(
+      (item) => String(item.id) === String(orderId)
     );
 
-    if (!Number.isInteger(index) || !orders[index]) return;
+    if (!order) {
+      message("Order nahi mila. Refresh karke dekhein.", true);
+      return;
+    }
 
-    if (paid) {
+    const updates = {};
+
+    if (action === "paid") {
       if (!confirm("Merchant account mein payment verify kar li hai?")) {
         return;
       }
-      orders[index].payment_status = "paid";
+      updates.payment_status = "paid";
     }
 
-    if (pending) {
-      orders[index].payment_status = "pending";
+    if (action === "pending") {
+      updates.payment_status = "pending";
     }
 
-    if (cancel) {
-      if (!confirm("Order cancel karna hai?")) return;
-      orders[index].order_status = "cancelled";
+    if (action === "processing") {
+      updates.order_status = "processing";
     }
 
-    localStorage.setItem(ORDER_KEY, JSON.stringify(orders));
-    renderOrders();
-    message("Order status update ho gaya.");
+    if (action === "shipped") {
+      updates.order_status = "shipped";
+    }
+
+    if (action === "delivered") {
+      updates.order_status = "delivered";
+    }
+
+    if (action === "cancelled") {
+      if (!confirm("Kya sach mein ye order cancel karna hai?")) {
+        return;
+      }
+      updates.order_status = "cancelled";
+    }
+
+    button.disabled = true;
+    message("Order update ho raha hai...");
+
+    try {
+      const { data, error } = await supabaseClient
+        .from("orders")
+        .update(updates)
+        .eq("id", orderId)
+        .select("id")
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        throw new Error("Order update nahi hua. Admin RLS permission check karein.");
+      }
+
+      message("Order successfully update ho gaya.");
+      await loadOrders();
+
+    } catch (error) {
+      console.error("ORDER UPDATE ERROR:", error);
+      message("Order update failed: " + error.message, true);
+      button.disabled = false;
+    }
   });
 
   // FIX OLD ADD PRODUCT FORM
