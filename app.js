@@ -717,14 +717,30 @@ function ratingMarkup(product) {
         <button type="button" data-detail-qty="1">+</button>
       </div>
 
-      <div class="detail-policy">
-        <h3>↩️ Return and replacement information</h3>
-        <p>Return eligibility product aur seller ki actual policy par depend karti hai.</p>
-        <p>Order karne se pehle product details aur applicable terms check karein.</p>
-        <small>
-          Website par wahi return/refund policy dikhayein jo aap sach mein provide karte hain.
-        </small>
-      </div>
+  
+<div class="return-policy-box">
+  <h3>↩️ Return, Refund & Replacement</h3>
+
+  <div class="policy-item">
+    <span>↩️ Return Available</span>
+    <strong>✓ Available</strong>
+  </div>
+
+  <div class="policy-item">
+    <span>💰 Refund Available</span>
+    <strong>✓ Available</strong>
+  </div>
+
+  <div class="policy-item">
+    <span>🔄 Replacement Available</span>
+    <strong>✓ Available</strong>
+  </div>
+
+  <p>
+    Return, refund aur replacement ki suvidha
+    lagu terms aur conditions ke anusar uplabdh hai.
+  </p>
+</div>
 
       <p><b>Payment:</b> UPI available · Cash on Delivery unavailable</p>
 
