@@ -1,0 +1,199 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meesho Sale - Admin Panel</title>
+  <link rel="stylesheet" href="./style.css?v=2">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./admin.js?v=1" defer></script>
+  <style>
+    body { background:#f7f3f7; }
+    .admin-page { max-width:1100px; margin:24px auto; padding:16px; }
+    .admin-header {
+      display:flex; justify-content:space-between; align-items:center;
+      gap:12px; flex-wrap:wrap; margin-bottom:20px;
+    }
+    .admin-header h1 { color:#9f2089; margin:0; }
+    .admin-box {
+      background:#fff; border-radius:14px; padding:20px;
+      margin:16px 0; box-shadow:0 3px 15px #0000000c;
+    }
+    .admin-login { max-width:430px; margin:50px auto; }
+    .admin-login label, .admin-form label {
+      display:block; margin:12px 0; font-weight:600;
+    }
+    .admin-login input, .admin-form input, .admin-form textarea {
+      display:block; width:100%; padding:12px; margin-top:6px;
+      border:1px solid #ddd; border-radius:8px; box-sizing:border-box;
+    }
+    .admin-nav {
+      display:flex; gap:8px; flex-wrap:wrap; margin:16px 0;
+    }
+    .admin-nav button {
+      padding:11px 18px; border:1px solid #9f2089;
+      border-radius:8px; background:white; color:#9f2089;
+      cursor:pointer;
+    }
+    .admin-nav button.active {
+      background:#9f2089; color:white;
+    }
+    .admin-panel[hidden], #adminDashboard[hidden],
+    #loginBox[hidden] { display:none !important; }
+    .admin-form { max-width:650px; }
+    .admin-form button, .admin-login button {
+      padding:12px 18px; border:0; border-radius:8px;
+      background:#9f2089; color:white; cursor:pointer;
+    }
+    .admin-product, .order-card {
+      background:#fff; border:1px solid #eee; border-radius:10px;
+      padding:14px; margin:12px 0;
+    }
+    .admin-product-actions {
+      display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
+    }
+    .admin-product-actions button, .order-card button {
+      padding:9px 12px; border:1px solid #9f2089;
+      border-radius:7px; background:#fff; color:#9f2089;
+      cursor:pointer;
+    }
+    .admin-note { color:#76516f; font-size:13px; line-height:1.5; }
+    .admin-top-actions { display:flex; gap:8px; }
+    #adminMessage { margin:12px 0; color:#9f2089; }
+  </style>
+</head>
+
+<body>
+  <main class="admin-page">
+
+    <header class="admin-header">
+      <h1>Meesho Sale Admin</h1>
+      <div class="admin-top-actions">
+        <a href="./index.html">View Website</a>
+        <button id="logoutButton" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <div id="adminMessage" role="status"></div>
+
+    <!-- ADMIN LOGIN -->
+    <section id="loginBox" class="admin-box admin-login">
+      <h2>Admin Login</h2>
+      <p class="admin-note">Login using your authorized admin email and password.</p>
+
+      <form id="adminLoginForm">
+        <label>
+          Email
+          <input type="email" name="email" required autocomplete="username">
+        </label>
+
+        <label>
+          Password
+          <input type="password" name="password" required autocomplete="current-password">
+        </label>
+
+        <button type="submit" id="loginButton">Login</button>
+      </form>
+    </section>
+
+    <!-- ADMIN DASHBOARD -->
+    <section id="adminDashboard" hidden>
+
+      <nav class="admin-nav" aria-label="Admin sections">
+        <button type="button" data-tab="products" class="active">Products</button>
+        <button type="button" data-tab="orders">Orders</button>
+        <button type="button" data-tab="payments">UPI & QR Settings</button>
+      </nav>
+
+      <!-- PRODUCTS -->
+      <section class="admin-panel admin-box" data-panel="products">
+        <h2>Manage Products</h2>
+        <p>Total products: <b id="adminCount">0</b></p>
+
+        <form id="addForm" class="admin-form">
+          <h3>Add New Product</h3>
+
+          <label>
+            Product name
+            <input name="title" required>
+          </label>
+
+          <label>
+            Category
+            <input name="category" required placeholder="Women, Beauty, Men, Home">
+          </label>
+
+          <label>
+            Selling price (₹)
+            <input name="price" type="number" min="1" step="0.01" required>
+          </label>
+
+          <label>
+            Old price / MRP (₹)
+            <input name="oldPrice" type="number" min="0" step="0.01" value="0">
+          </label>
+
+          <label>
+            Product image URL
+            <input name="image" type="url" placeholder="https://...">
+          </label>
+
+          <label>
+            Description
+            <textarea name="description" rows="3"></textarea>
+          </label>
+
+          <button type="submit">Add Product</button>
+        </form>
+
+        <hr>
+        <h3>Existing Products</h3>
+        <div id="adminProducts">
+          Loading products...
+        </div>
+      </section>
+
+      <!-- ORDERS -->
+      <section class="admin-panel admin-box" data-panel="orders" hidden>
+        <h2>Customer Orders</h2>
+        <p class="admin-note">
+          फिलहाल पुराने orders इसी ब्राउज़र के local storage से दिखेंगे।
+          Supabase order sync अगले चरण में जोड़ा जाएगा।
+        </p>
+        <div id="adminOrders">Loading orders...</div>
+      </section>
+
+      <!-- PAYMENT SETTINGS -->
+      <section class="admin-panel admin-box" data-panel="payments" hidden>
+        <h2>UPI & QR Settings</h2>
+
+        <form id="paymentForm" class="admin-form">
+          <label>
+            Merchant name
+            <input name="merchantName" required>
+          </label>
+
+          <label>
+            Business UPI ID
+            <input name="upiId" required placeholder="yourname@bank">
+          </label>
+
+          <label>
+            QR image URL (optional)
+            <input name="qrImage" type="url" placeholder="https://...">
+          </label>
+
+          <button type="submit">Save Payment Settings</button>
+        </form>
+
+        <p class="admin-note">
+          Payment verification manually merchant/bank records check karke hi karein.
+          Customer ke payment claim par order ko paid mark na karein.
+        </p>
+      </section>
+
+    </section>
+  </main>
+</body>
+</html>
