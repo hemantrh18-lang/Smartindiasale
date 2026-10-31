@@ -1959,7 +1959,9 @@ toast("Delete response: " + JSON.stringify(deletedRows));
   $("#checkoutOpen")?.addEventListener("click", openCheckout);
 
   $("#checkoutForm")?.addEventListener("submit", continueToPayment);
-
+  $("#checkoutForm")?.addEventListener("submit", () => {
+  console.log("CHECKOUT FORM SUBMITTED");
+});
   $("#openUpiPayment")?.addEventListener("click", launchUpi);
 
   $("#paymentDone")?.addEventListener("click", () => {
