@@ -1011,7 +1011,7 @@ function ratingMarkup(product) {
 
     const amount = checkoutDraft.total;
     const uri = upiUri(amount, checkoutDraft.reference);
-    const staticQr = validUrl(payment.qrImage);
+    
 
     host.innerHTML = `
       <h3>Pay ${money(amount)} via UPI</h3>
@@ -1038,16 +1038,7 @@ function ratingMarkup(product) {
         `
       }
 
-      ${
-        staticQr ? `
-          <p class="muted">
-            Merchant static QR (amount may not be pre-filled):
-          </p>
-          <div class="qr-holder">
-            <img src="${esc(staticQr)}" alt="Merchant UPI QR">
-          </div>
-        ` : ""
-      }
+    
 
       <p class="muted">
         Payment is not automatically verified by this demo.
