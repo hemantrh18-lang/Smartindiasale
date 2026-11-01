@@ -1371,22 +1371,93 @@ order.databaseId = null;
     `;
   }
 
-  function renderHistory(phone = "") {
-    const host = $("#historyResults");
-    if (!host) return;
+  
+async function renderHistory(phone = "") {
+  const host = $("#historyResults");
+  if (!host) return;
 
-    const matches = orders.filter(order =>
-      String(order.phone || "") === phone
+  if (!phone) {
+    host.innerHTML = `
+      <p class="muted">Enter your mobile number to look up orders.</p>
+    `;
+    return;
+  }
+
+  const cleanPhone = String(phone).replace(/\D/g, "");
+
+  if (!/^[0-9]{10}$/.test(cleanPhone)) {
+    host.innerHTML = `<p class="muted">Valid 10-digit mobile number enter karein.</p>`;
+    return;
+  }
+
+  host.innerHTML = `<p class="muted">Your orders are loading...</p>`;
+
+  try {
+    const { data, error } = await supabaseClient.rpc(
+      "get_my_orders",
+      { p_phone: cleanPhone }
     );
 
-    host.innerHTML = matches.length
-      ? matches.map(order => card(order)).join("")
-      : `<p class="muted">${
-          phone
-            ? "No orders for this number in this browser."
-            : "Enter your mobile number to look up orders."
-        }</p>`;
+    if (error) throw error;
+
+    if (!Array.isArray(data) || data.length === 0) {
+      host.innerHTML = `
+        <p class="muted">Is mobile number se koi order nahi mila.</p>
+      `;
+      return;
+    }
+
+    host.innerHTML = data.map(order => {
+      const paid = String(order.payment_status || "")
+        .toLowerCase().includes("paid");
+
+      const items = Array.isArray(order.items) ? order.items : [];
+
+      const itemMarkup = items.map(item => `
+        <p>
+          ${esc(item.title || item.name || "Product")}
+          ${item.size ? `(Size: ${esc(item.size)})` : ""}
+          × ${Number(item.qty || 0)}
+        </p>
+      `).join("");
+
+      const created = order.created_at
+        ? new Date(order.created_at).toLocaleString("en-IN")
+        : "Date unavailable";
+
+      return `
+        <article class="order-card">
+          <h4>Order #${esc(String(order.id).slice(0, 8))}</h4>
+
+          <span class="status ${paid ? "paid" : ""}">
+            Payment: ${paid ? "Paid" : "Pending"}
+          </span>
+
+          <div>${itemMarkup}</div>
+
+          <p><b>Total: ${money(order.total)}</b></p>
+
+          <p>
+            Order status:
+            <b>${esc(order.order_status || "placed")}</b>
+          </p>
+
+          <small>${esc(created)}</small>
+        </article>
+      `;
+    }).join("");
+
+  } catch (error) {
+    console.error("My Orders error:", error);
+
+    host.innerHTML = `
+      <p class="muted">
+        Orders load nahi hue. Please try again.
+      </p>
+    `;
   }
+}
+
 
   function renderAdminOrders() {
     const host = $("#adminOrders");
