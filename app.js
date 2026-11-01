@@ -660,7 +660,30 @@ function deliveryBenefitsMarkup() {
 .product-rating small {
   color: #777;
       }
-    `;
+  .delivery-benefits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.delivery-benefits span {
+  display: inline-block;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.delivery-free {
+  background: #e6f7e9;
+  color: #16823b;
+}
+
+.delivery-fast {
+  background: #fff3d9;
+  color: #a56500;
+}  `;
 
     document.head.appendChild(style);
     return modal;
