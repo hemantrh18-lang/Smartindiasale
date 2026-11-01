@@ -220,6 +220,16 @@ function ratingMarkup(product) {
     </div>
   `;
 }
+ 
+function deliveryBenefitsMarkup() {
+  return `
+    <div class="delivery-benefits">
+      <span class="delivery-free">🚚 FREE DELIVERY</span>
+      <span class="delivery-fast">⚡ FAST DELIVERY IN 2 DAYS</span>
+    </div>
+  `;
+}
+ 
   // Load products from Supabase
   async function loadProductsFromSupabase() {
     try {
@@ -446,6 +456,7 @@ function ratingMarkup(product) {
                   : ""
               }
             </div>
+             ${deliveryBenefitsMarkup()}
 
             <p class="product-description">
               ${esc(p.description || "Tap to view product details.")}
@@ -693,7 +704,7 @@ function ratingMarkup(product) {
             : ""
         }
       </div>
-
+      ${deliveryBenefitsMarkup()}
       <h3>Product description</h3>
       <p class="detail-description">${esc(description)}</p>
 
