@@ -2004,29 +2004,74 @@ toast("Delete response: " + JSON.stringify(deletedRows));
   return;
 }
 
-    const markPaid = event.target.closest("[data-paid]");
+   
+const markPaid = event.target.closest("[data-paid]");
 
-    if (markPaid) {
-      const order = orders.find(x => x.id === markPaid.dataset.paid);
-      if (!order) return;
+if (markPaid) {
+  const order = orders.find(
+    x => x.id === markPaid.dataset.paid
+  );
 
-      const confirmed = confirm(
-        "Merchant/bank records mein actual payment verify ki hai? " +
-        "Sirf customer ke claim par confirm na karein."
-      );
+  if (!order) return;
 
-      if (!confirmed) return;
+  const confirmed = confirm(
+    "Kya merchant/bank records mein actual payment verify ki hai?"
+  );
 
-      order.paymentStatus = "Paid (manually verified)";
-      order.status = "Confirmed";
+  if (!confirmed) return;
 
-      if (write(K.o, orders)) {
-        renderAdminOrders();
-        toast("Payment marked verified. Order confirmed.");
+  markPaid.disabled = true;
+
+  (async () => {
+    try {
+      const { data: sessionData, error: sessionError } =
+        await supabaseClient.auth.getSession();
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Admin login dobara karein.");
       }
 
-      return;
+      const { data: isAdmin, error: roleError } =
+        await supabaseClient.rpc("is_admin");
+
+      if (roleError || isAdmin !== true) {
+        throw new Error("Admin permission verify nahi hui.");
+      }
+
+      const { data, error } = await supabaseClient
+        .from("orders")
+        .update({
+          payment_status: "paid",
+          order_status: "confirmed"
+        })
+        .eq("payment_reference", order.paymentReference)
+        .select("id");
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error("Database mein order update nahi hua.");
+      }
+
+      order.paymentStatus = "Paid";
+      order.status = "Confirmed";
+
+      write(K.o, orders);
+      renderAdminOrders();
+
+      toast("Payment Supabase mein verified ho gayi!");
+
+    } catch (error) {
+      console.error("Payment update failed:", error);
+      toast("Payment update nahi hui: " + error.message);
+    } finally {
+      if (markPaid.isConnected) markPaid.disabled = false;
     }
+  })();
+
+  return;
+}
+
 
     const markPending = event.target.closest("[data-pending]");
 
