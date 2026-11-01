@@ -136,8 +136,12 @@
   });
 
   // PRODUCT FORM
-  function productFormHTML(product = {}) {
+    function productFormHTML(product = {}) {
     const editing = product.id !== undefined && product.id !== null;
+
+    const extraImages = Array.isArray(product.image_urls)
+      ? product.image_urls
+      : [];
 
     return `
       <form class="admin-product-editor"
@@ -165,10 +169,31 @@
         <input name="original_price" type="number" min="0" step="0.01"
           value="${escapeHTML(product.original_price ?? "")}">
 
-        <label>Product Image URL</label>
+        <h4>Product Photos (Maximum 4)</h4>
+
+        <label>Photo 1 — Main Image</label>
         <input name="image_url" type="url"
           value="${escapeHTML(product.image_url || "")}"
-          placeholder="https://example.com/image.jpg">
+          placeholder="https://example.com/photo1.jpg">
+
+        <label>Photo 2</label>
+        <input name="image_url_2" type="url"
+          value="${escapeHTML(extraImages[0] || "")}"
+          placeholder="https://example.com/photo2.jpg">
+
+        <label>Photo 3</label>
+        <input name="image_url_3" type="url"
+          value="${escapeHTML(extraImages[1] || "")}"
+          placeholder="https://example.com/photo3.jpg">
+
+        <label>Photo 4</label>
+        <input name="image_url_4" type="url"
+          value="${escapeHTML(extraImages[2] || "")}"
+          placeholder="https://example.com/photo4.jpg">
+
+        <p style="font-size:12px;color:#666">
+          Customer product page par photos swipe karke dekh sakega.
+        </p>
 
         <label>Product Description</label>
         <textarea name="description" rows="3"
@@ -212,7 +237,6 @@
       </form>
     `;
   }
-
   function readProductForm(form) {
     const rating = Number(form.elements.rating.value || 0);
     const price = Number(form.elements.price.value);
