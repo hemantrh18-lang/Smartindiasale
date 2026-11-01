@@ -170,7 +170,13 @@ async function loadPaymentSettingsFromSupabase() {
 }
 
   // Convert Supabase database columns into the website format
-  function mapDatabaseProduct(row) {
+ function mapDatabaseProduct(row) {
+  const extraImages = Array.isArray(row.image_urls)
+    ? row.image_urls.map(url => validUrl(url)).filter(Boolean)
+    : [];
+
+  const mainImage = validUrl(row.image_url) || placeholder;
+
   return {
     id: row.id,
     title: row.name || "Untitled Product",
@@ -178,7 +184,9 @@ async function loadPaymentSettingsFromSupabase() {
     price: Number(row.price) || 0,
     oldPrice: Number(row.original_price) || 0,
     tag: "SALE",
-    image: validUrl(row.image_url) || placeholder,
+    image: mainImage,
+    image_urls: extraImages,
+    images: [mainImage, ...extraImages],
     description: row.description || "",
     active: row.active !== false,
     stock: Number(row.stock) || 0,
@@ -187,7 +195,6 @@ async function loadPaymentSettingsFromSupabase() {
     ratingVisible: row.rating_visible === true
   };
 }
-
 function ratingMarkup(product) {
   if (
     product.ratingVisible !== true ||
@@ -219,7 +226,7 @@ function ratingMarkup(product) {
       const { data, error } = await supabaseClient
         .from("products")
         .select(
-          "id, name, category, price, original_price, image_url, description, stock, active, rating, rating_count, rating_visible"
+         "id, name, category, price, original_price, image_url, image_urls, description, stock, active, rating, rating_count, rating_visible"
         )
         .order("id", { ascending: true });
 
