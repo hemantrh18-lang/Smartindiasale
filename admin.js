@@ -237,7 +237,7 @@
       </form>
     `;
   }
-  function readProductForm(form) {
+    function readProductForm(form) {
     const rating = Number(form.elements.rating.value || 0);
     const price = Number(form.elements.price.value);
     const originalPrice = Number(
@@ -258,9 +258,11 @@
       throw new Error("Please enter valid numbers.");
     }
 
-    if (price < 0 || originalPrice < 0 ||
-        stock < 0 || ratingCount < 0 ||
-        rating < 0 || rating > 5) {
+    if (
+      price < 0 || originalPrice < 0 ||
+      stock < 0 || ratingCount < 0 ||
+      rating < 0 || rating > 5
+    ) {
       throw new Error("Price, stock or rating value is invalid.");
     }
 
@@ -271,12 +273,21 @@
       throw new Error("Product name aur category zaroor bharo.");
     }
 
+    const mainImage = form.elements.image_url.value.trim();
+
+    const extraImages = [
+      form.elements.image_url_2.value.trim(),
+      form.elements.image_url_3.value.trim(),
+      form.elements.image_url_4.value.trim()
+    ].filter(Boolean);
+
     return {
       name,
       category,
       price,
       original_price: originalPrice,
-      image_url: form.elements.image_url.value.trim(),
+      image_url: mainImage,
+      image_urls: extraImages,
       description: form.elements.description.value.trim(),
       stock: Math.floor(stock),
       rating,
