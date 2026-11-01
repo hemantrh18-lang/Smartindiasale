@@ -444,7 +444,7 @@ function ratingMarkup(product) {
               ${esc(p.description || "Tap to view product details.")}
             </p>
 
-            <p class="policy-short">↩️ 10 Days Return*</p>
+            
 
             ${
               config ? `
