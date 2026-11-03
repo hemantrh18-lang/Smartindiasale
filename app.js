@@ -1074,7 +1074,13 @@ function deliveryBenefitsMarkup() {
         <code>${esc(payment.upiId || "Set in Admin → UPI & QR")}</code>
       </p>
       <p class="payment-total">Exact cart total: ${money(amount)}</p>
-
+<button
+  id="openUpiPayment"
+  class="buy-btn full"
+  type="button"
+  ${uri ? "" : "disabled"}>
+  ${uri ? "Pay via UPI" : "UPI not configured"}
+</button>
       ${
         uri ? `
           <div id="dynamicQr" class="qr-holder"></div>
