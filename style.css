@@ -1,7 +1,7 @@
 
 /* =========================================
    MEESHO SALE — PREMIUM SHOPPING DESIGN
-   Existing app functionality preserved
+   Updated Product Button Alignment
 ========================================= */
 
 * {
@@ -314,15 +314,23 @@ nav#categories button:hover {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 17px;
+  align-items: stretch;
 }
+
+/* PRODUCT CARD ALIGNMENT FIX */
 
 .product-card {
   border: 1px solid #eee5ee;
   border-radius: 13px;
   overflow: hidden;
   min-width: 0;
+  min-height: 100%;
+  height: 100%;
   background: white;
   transition: transform .2s, box-shadow .2s;
+
+  display: flex;
+  flex-direction: column;
 }
 
 .product-card:hover {
@@ -335,6 +343,7 @@ nav#categories button:hover {
   aspect-ratio: 4/5;
   background: #faf5fa;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .product-image {
@@ -363,11 +372,15 @@ nav#categories button:hover {
   box-shadow: 0 2px 7px #00000012;
 }
 
+/* PRODUCT INFORMATION */
+
 .product-info {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .product-title {
@@ -410,17 +423,53 @@ nav#categories button:hover {
   font-weight: bold;
 }
 
+/* SIZE SELECTION */
+
+.size-label {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #5c4a5d;
+}
+
+.size-label select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d9c7d8;
+  border-radius: 7px;
+  background: #fff;
+  font: inherit;
+  color: #29232b;
+  min-width: 0;
+}
+
+.product-size:focus {
+  outline: 2px solid #e9b5df;
+  outline-offset: 1px;
+}
+
+/* PRODUCT BUTTONS — ALWAYS SAME LINE */
+
 .product-buttons {
   display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 7px;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 2px;
 }
 
 .product-buttons button {
-  flex: 1;
-  padding: 9px 5px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 4px;
   border-radius: 7px;
   font-size: 11px;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .add-btn {
@@ -742,32 +791,6 @@ form textarea {
   padding: 10px;
 }
 
-/* SIZE SELECTION */
-
-.size-label {
-  display: grid;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: bold;
-  color: #5c4a5d;
-}
-
-.size-label select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #d9c7d8;
-  border-radius: 7px;
-  background: #fff;
-  font: inherit;
-  color: #29232b;
-  min-width: 0;
-}
-
-.product-size:focus {
-  outline: 2px solid #e9b5df;
-  outline-offset: 1px;
-}
-
 /* CHECKOUT STEPS */
 
 .checkout-steps {
@@ -994,12 +1017,20 @@ a:focus-visible {
     font-size: 16px;
   }
 
+  /* IMPORTANT: Buttons stay side by side */
   .product-buttons {
-    flex-direction: column;
+    flex-direction: row;
+    gap: 5px;
+    margin-top: auto;
   }
 
   .product-buttons button {
-    padding: 9px 4px;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 2px;
+    font-size: 10px;
+    white-space: nowrap;
   }
 
   .tools {
@@ -1051,10 +1082,16 @@ a:focus-visible {
     padding: 7px;
   }
 
+  .product-buttons {
+    gap: 4px;
+  }
+
   .product-buttons button {
-    font-size: 10px;
+    font-size: 9px;
+    padding: 8px 1px;
   }
 }
+
 /* MOBILE HEADER FIX */
 
 @media (max-width: 600px) {
