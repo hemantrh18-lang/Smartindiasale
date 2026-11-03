@@ -412,102 +412,88 @@ function deliveryBenefitsMarkup() {
   }
 
   function renderProducts() {
-    const host = $("#products");
-    if (!host) return;
+  const host = $("#products");
+  if (!host) return;
 
-    const items = list();
+  const items = list();
 
-    host.innerHTML = items.map(p => {
-      const config = sizeConfig(p);
-      const price = Number(p.price) || 0;
-      const oldPrice = Number(p.oldPrice) || 0;
+  host.innerHTML = items.map(p => {
+    const price = Number(p.price) || 0;
+    const oldPrice = Number(p.oldPrice) || 0;
 
-      const discount = oldPrice > price
-        ? Math.round(100 * (1 - price / oldPrice))
-        : 0;
+    const discount = oldPrice > price
+      ? Math.round(100 * (1 - price / oldPrice))
+      : 0;
 
-      return `
-        <article class="product-card">
-          <div class="product-image-wrap"
+    return `
+      <article class="product-card">
+        <div class="product-image-wrap"
+          data-detail="${esc(p.id)}"
+          role="button" tabindex="0"
+          aria-label="View ${esc(p.title)} details">
+
+          <img class="product-image"
+            src="${esc(validUrl(p.image) || placeholder)}"
+            alt="${esc(p.title)}">
+
+          <span class="product-tag">${esc(p.tag || "SALE")}</span>
+        </div>
+
+        <div class="product-info">
+          <h3 class="product-title"
             data-detail="${esc(p.id)}"
-            role="button" tabindex="0"
-            aria-label="View ${esc(p.title)} details">
-            <img class="product-image"
-              src="${esc(validUrl(p.image) || placeholder)}"
-              alt="${esc(p.title)}">
-            <span class="product-tag">${esc(p.tag || "SALE")}</span>
-          </div>
+            role="button" tabindex="0">
+            ${esc(p.title)}
+          </h3>
 
-          <div class="product-info">
-            <h3 class="product-title"
-              data-detail="${esc(p.id)}"
-              role="button" tabindex="0">
-              ${esc(p.title)}
-            </h3>
+          <p class="product-category">
+            ${esc(p.category || "")}
+          </p>
 
-            <p class="product-category">${esc(p.category || "")}</p>
-
-            <div class="product-price">
-              <span class="price-now">${money(price)}</span>
-              ${
-                oldPrice > price
-                  ? `<span class="price-old">${money(oldPrice)}</span>
-                     <span class="discount">${discount}% off</span>`
-                  : ""
-              }
-            </div>
-             ${deliveryBenefitsMarkup()}
-
-            <p class="product-description">
-              ${esc(p.description || "Tap to view product details.")}
-            </p>
-
-            
+          <div class="product-price">
+            <span class="price-now">${money(price)}</span>
 
             ${
-              config ? `
-                <label class="size-label">
-                  ${esc(config.label)}
-                  <select class="product-size"
-                    data-size-for="${esc(p.id)}">
-                    <option value="">Choose size</option>
-                    ${config.sizes.map(size =>
-                      `<option value="${esc(size)}">${esc(size)}</option>`
-                    ).join("")}
-                  </select>
-                </label>
-              ` : ""
+              oldPrice > price
+                ? `<span class="price-old">${money(oldPrice)}</span>
+                   <span class="discount">${discount}% off</span>`
+                : ""
             }
-
-            <div class="product-buttons">
-              <button class="add-btn" data-add="${esc(p.id)}" type="button">
-                Add to cart
-              </button>
-              <button class="buy-btn" data-buy="${esc(p.id)}" type="button">
-                Buy now
-              </button>
-            </div>
           </div>
-        </article>
-      `;
-    }).join("");
 
-    const empty = $("#empty");
-    const resultCount = $("#resultCount");
+          <div class="product-buttons">
+            <button class="add-btn"
+              data-add="${esc(p.id)}" type="button">
+              Add to cart
+            </button>
 
-    if (empty) empty.hidden = items.length > 0;
-    if (resultCount) resultCount.textContent = items.length + " products";
+            <button class="buy-btn"
+              data-buy="${esc(p.id)}" type="button">
+              Buy now
+            </button>
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
 
-    $$(".product-image").forEach(img => {
-      img.onerror = () => {
-        img.onerror = null;
-        img.src = placeholder;
-      };
-    });
+  const empty = $("#empty");
+  const resultCount = $("#resultCount");
 
-    renderAdminProducts();
+  if (empty) empty.hidden = items.length > 0;
+  if (resultCount) {
+    resultCount.textContent = items.length + " products";
   }
 
+  $$(".product-image").forEach(img => {
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = placeholder;
+    };
+  });
+
+  renderAdminProducts();
+}
   /* PRODUCT DETAILS POPUP */
 
   function ensureDetailModal() {
@@ -1854,21 +1840,26 @@ if (!Number.isInteger(ratingCount) || ratingCount < 0) {
 
     const productButton = event.target.closest("[data-add], [data-buy]");
 
-    if (productButton) {
-      const id = productButton.dataset.add || productButton.dataset.buy;
+if (productButton) {
+  const id = productButton.dataset.add || productButton.dataset.buy;
 
-      const product = products.find(
-        item => String(item.id) === String(id) &&
-          item.active !== false
-      );
+  const product = products.find(
+    item => String(item.id) === String(id) &&
+      item.active !== false
+  );
 
-      if (product) {
-        add(product, Boolean(productButton.dataset.buy));
-      }
+  if (product) {
+    const config = sizeConfig(product);
 
-      return;
+    if (config) {
+      openProductDetails(product.id);
+    } else {
+      add(product, Boolean(productButton.dataset.buy));
     }
+  }
 
+  return;
+}
     const qtyButton = event.target.closest("[data-qty]");
 
     if (qtyButton) {
