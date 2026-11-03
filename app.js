@@ -1151,24 +1151,41 @@ function deliveryBenefitsMarkup() {
   }
 
   function launchUpi() {
-    if (!checkoutDraft) {
-      toast("Pehle address complete karein");
-      return;
-    }
-
-    const uri = upiUri(
-      checkoutDraft.total,
-      checkoutDraft.reference
-    );
-
-    if (!uri) {
-      toast("Admin panel mein valid UPI ID save karein");
-      return;
-    }
-
-    // Opening a UPI app does not prove payment.
-    window.location.href = uri;
+  if (!checkoutDraft) {
+    toast("Pehle address complete karein");
+    return;
   }
+
+  const upiId = String(payment.upiId || "").trim();
+  const merchant = String(
+    payment.merchantName || "Meesho Sale"
+  ).trim();
+  const amount = Number(checkoutDraft.total);
+
+  if (!/^[\w.\-]{2,256}@[a-zA-Z0-9.\-]{2,64}$/.test(upiId)) {
+    toast("Admin panel mein valid UPI ID save karein");
+    return;
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    toast("Payment amount valid nahi hai");
+    return;
+  }
+
+  const params = new URLSearchParams({
+    pa: upiId,
+    pn: merchant,
+    am: amount.toFixed(2),
+    cu: "INR"
+  });
+
+  const directUri = "upi://pay?" + params.toString();
+
+  console.log("DIRECT UPI LINK:", directUri);
+
+  // Opening a UPI app does not prove payment.
+  window.location.href = directUri;
+}
 
   /* ORDER CREATION: PENDING UNTIL ADMIN VERIFIES */
 
