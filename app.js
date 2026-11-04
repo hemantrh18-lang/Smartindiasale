@@ -1060,95 +1060,74 @@ function deliveryBenefitsMarkup() {
 
   return uri;
 }
-  function renderPayment() {
-    const host = $("#checkoutPayment");
-    if (!host || !checkoutDraft) return;
+  
+function renderPayment() {
+  const host = $("#checkoutPayment");
+  if (!host || !checkoutDraft) return;
 
-    const amount = checkoutDraft.total;
-    const uri = upiUri(amount, checkoutDraft.reference);
-     console.log("UPI PAYMENT LINK:", uri);
+  const amount = checkoutDraft.total;
+  const uri = upiUri(amount, checkoutDraft.reference);
 
-    host.innerHTML = `
-      <h3>Pay ${money(amount)} via UPI</h3>
-      <p>Business: ${esc(payment.merchantName || "Meesho Sale")}</p>
-      <p>UPI ID:
-        <code>${esc(payment.upiId || "Set in Admin → UPI & QR")}</code>
-      </p>
-      <p class="payment-total">Exact cart total: ${money(amount)}</p>
-<button
-  id="openUpiPayment"
-  class="buy-btn full"
-  type="button"
-  ${uri ? "" : "disabled"}>
-  ${uri ? "Pay via UPI" : "UPI not configured"}
-</button>
-      ${
-        uri ? `
-          <div id="dynamicQr" class="qr-holder"></div>
-          <p class="muted">
-            Scan this dynamic QR using a supported UPI app.
-            Verify the amount shown in your UPI app before paying.
-          </p>
-          <button id="copyUpi" class="plain full" type="button">
-            Copy UPI payment link
-          </button>
-        ` : `
-          <p class="notice">
-            UPI ID set nahi hai. Admin → UPI & QR mein valid payment details save karein.
-          </p>
-        `
-      }
+  host.innerHTML = `
+    <h3>Pay ${money(amount)} via UPI</h3>
 
-    
+    <p>Business: ${esc(payment.merchantName || "Meesho Sale")}</p>
 
-      <p class="muted">
-        Payment is not automatically verified by this demo.
-        Admin must check actual merchant payment records before marking
-        an order paid.
-      </p>
-    `;
+    <p>UPI ID:
+      <code>${esc(payment.upiId || "Set in Admin → UPI & QR")}</code>
+    </p>
 
-    const qrHost = $("#dynamicQr");
+    <p class="payment-total">
+      Exact cart total: ${money(amount)}
+    </p>
 
-    if (qrHost && uri && window.QRCode) {
-      new QRCode(qrHost, {
-        text: uri,
-        width: 190,
-        height: 190
-      });
-    } else if (qrHost) {
-      qrHost.textContent =
-        "QR library unavailable. Use the UPI payment link.";
+    ${
+      uri ? `
+        <div id="dynamicQr" class="qr-holder"
+          style="width:100%;display:flex;justify-content:center;
+          align-items:center;padding:18px 0;">
+        </div>
+
+        <p class="muted" style="text-align:center;">
+          Scan this QR using a supported UPI app.
+          Verify the merchant name and exact amount before paying.
+        </p>
+      ` : `
+        <p class="notice">
+          UPI ID set nahi hai. Admin → UPI & QR mein valid payment
+          details save karein.
+        </p>
+      `
     }
 
-    const payButton = $("#openUpiPayment");
+    <p class="muted">
+      Payment is not automatically verified.
+      Admin must check actual merchant payment records before
+      marking an order paid.
+    </p>
+  `;
 
-    if (payButton) {
-      payButton.disabled = !uri;
-      payButton.textContent = uri
-        ? "Pay " + money(amount) + " using UPI"
-        : "UPI not configured";
-    }
+  const qrHost = $("#dynamicQr");
 
-    const copyButton = $("#copyUpi");
-
-    if (copyButton && uri) {
-      copyButton.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(uri);
-          toast("UPI link copied");
-        } catch {
-          toast("Copy unavailable. Try the Pay using UPI button.");
-        }
-      });
-    }
-
-    const message = $("#paymentMessage");
-    const doneButton = $("#paymentDone");
-
-    if (message) message.hidden = true;
-    if (doneButton) doneButton.disabled = false;
+  if (qrHost && uri && window.QRCode) {
+    new QRCode(qrHost, {
+      text: uri,
+      width: 280,
+      height: 280,
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  } else if (qrHost) {
+    qrHost.textContent =
+      "QR load nahi hua. Page refresh karke dobara try karein.";
   }
+
+  const message = $("#paymentMessage");
+  const doneButton = $("#paymentDone");
+
+  if (message) message.hidden = true;
+  if (doneButton) doneButton.disabled = false;
+}
+
 
   function launchUpi() {
   if (!checkoutDraft) {
