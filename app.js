@@ -2184,14 +2184,7 @@ if (markPaid) {
   $("#checkoutForm")?.addEventListener("submit", () => {
   console.log("CHECKOUT FORM SUBMITTED");
 });
-  document.addEventListener("click", function(event) {
-  const button = event.target.closest("#openUpiPayment");
-
-  if (button) {
-    event.preventDefault();
-    launchUpi();
-  }
-});
+  
 
   $("#paymentDone")?.addEventListener("click", () => {
     if (!checkoutDraft) {
